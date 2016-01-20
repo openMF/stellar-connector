@@ -29,6 +29,8 @@ public class SecurityService {
 
   public void verifyApiKey(final String apiKey)
       throws InvalidApiKeyException {
+
+    //TODO: actually verify the key.
     throw new InvalidApiKeyException(apiKey);
   }
 

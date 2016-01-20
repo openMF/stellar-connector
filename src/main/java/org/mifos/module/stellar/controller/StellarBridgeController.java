@@ -15,7 +15,11 @@
  */
 package org.mifos.module.stellar.controller;
 
+import org.mifos.module.stellar.federation.FederationFailedException;
+import org.mifos.module.stellar.federation.InvalidStellarAddressException;
+import org.mifos.module.stellar.federation.StellarAddress;
 import org.mifos.module.stellar.restdomain.AccountBridgeConfiguration;
+import org.mifos.module.stellar.restdomain.TrustLineConfiguration;
 import org.mifos.module.stellar.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -54,6 +58,25 @@ public class StellarBridgeController {
       this.stellarBridgeService.sendPaymentToStellar(mifosTenantId, payload);
     }
 
+
+    return new ResponseEntity<>(HttpStatus.OK);
+  }
+
+  @RequestMapping(value = "/stellar/trustline", method = RequestMethod.POST,
+                  consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<Void> createTrustLine(
+      @RequestHeader("X-Stellar-Bridge-API-Key") final String apiKey,
+      @RequestHeader("X-Mifos-Platform-TenantId") final String mifosTenantId,
+      @RequestBody final TrustLineConfiguration stellarTrustLineConfig)
+      throws InvalidStellarAddressException
+  {
+    this.securityService.verifyApiKey(apiKey);
+
+    this.stellarBridgeService.createTrustLine(
+        mifosTenantId,
+        StellarAddress.parse(stellarTrustLineConfig.getTrustedAccount()),
+        stellarTrustLineConfig.getTrustedCurrency(),
+        stellarTrustLineConfig.getMaximumAmount());
 
     return new ResponseEntity<>(HttpStatus.OK);
   }
@@ -104,18 +127,34 @@ public class StellarBridgeController {
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public void handleInvalidApiKeyException(
       @SuppressWarnings("unused") final InvalidApiKeyException ex) {
+    //TODO: add message to error
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public void handleInvalidConfigurationException(
       @SuppressWarnings("unused") final InvalidConfigurationException ex) {
+    //TODO: add message to error
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public void handleStellarAccountCreationFailedException(
       @SuppressWarnings("unused") final StellarAccountCreationFailedException ex) {
+    //TODO: add message to error
+  }
 
+  @ExceptionHandler
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public void handleInvalidStellarAddressException(
+      @SuppressWarnings("unused") final InvalidStellarAddressException ex) {
+    //TODO: add message to error
+  }
+
+  @ExceptionHandler
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public void handleFederationFailedException(
+      @SuppressWarnings("unused") final FederationFailedException ex) {
+    //TODO: add message to error.
   }
 }

@@ -3,9 +3,9 @@ CREATE TABLE stellar_account_bridge (
   START WITH 1
   INCREMENT BY 1 )                                                            NOT NULL,
   mifos_tenant_id             VARCHAR(32)                                     NOT NULL,
-  rest_api_key                VARCHAR(32)                                     NOT NULL,
+  rest_api_key                VARCHAR(40)                                     NOT NULL,
   mifos_token                 VARCHAR(256)                                    NOT NULL,
-  stellar_account_public_key  VARCHAR(60)                                     NOT NULL,
+  stellar_account_id          VARCHAR(60)                                     NOT NULL,
   stellar_account_private_key VARCHAR(60)                                     NOT NULL,
   UNIQUE (mifos_tenant_id)
 );

@@ -38,7 +38,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     "org.mifos.module.stellar.service",
     "org.mifos.module.stellar.listener",
     "org.mifos.module.stellar.controller",
-    "org.mifos.module.stellar.repository"
+    "org.mifos.module.stellar.repository",
+    "org.mifos.module.stellar.federation"
 })
 public class MifosStellarBridgeConfiguration {
   @Bean

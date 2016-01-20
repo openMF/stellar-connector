@@ -21,7 +21,8 @@ spring:
     password:
     driver-class-name: org.hsqldb.jdbcDriver
 
-# stellar server configuration
+# stellar horizon server configuration
 stellar:
-  address: http://localhost:32769
+  horizon-address: http://localhost:32769
   installation-account-private-key: SDHOAMBNLGCE2MV5ZKIVZAQD3VCLGP53P3OBSBI6UN5L5XZI5TKHFQL4
+  local-federation-domain: mifos-installation.org

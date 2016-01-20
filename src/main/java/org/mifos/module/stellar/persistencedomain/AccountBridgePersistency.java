@@ -26,37 +26,40 @@ public class AccountBridgePersistency {
   private Long id;
 
   @Column(name = "rest_api_key")
-  private final String restApiKey;
+  private String restApiKey;
 
   @Column(name = "mifos_tenant_id")
-  private final String mifosTenantId;
+  private String mifosTenantId;
 
   @Column(name = "mifos_token")
-  private final String mifosToken;
+  private String mifosToken;
 
-  @Column(name = "stellar_account_public_key")
-  private final String stellarAccountPublicKey;
+  @Column(name = "stellar_account_id")
+  private String stellarAccountId;
 
   @Column(name = "stellar_account_private_key")
-  private final byte[] stellarAccountPrivateKey;
+  private char[] stellarAccountPrivateKey;
+
+  @SuppressWarnings("unused")
+  public AccountBridgePersistency() {}
 
   public AccountBridgePersistency(
       final String restApiKey,
       final String mifosTenantId,
       final String mifosToken,
-      final String stellarAccountPublicKey,
-      final byte[] stellarAccountPrivateKey) {
+      final String stellarAccountId,
+      final char[] stellarAccountPrivateKey) {
 
     this.restApiKey = restApiKey;
     this.mifosTenantId = mifosTenantId;
     this.mifosToken = mifosToken;
-    this.stellarAccountPublicKey = stellarAccountPublicKey;
+    this.stellarAccountId = stellarAccountId;
     this.stellarAccountPrivateKey = stellarAccountPrivateKey;
   }
 
   public void clearSensitiveData()
   {
-    Arrays.fill(stellarAccountPrivateKey, (byte)0);
+    Arrays.fill(stellarAccountPrivateKey, (char)0);
   }
 
   public Long getId() {
@@ -75,11 +78,11 @@ public class AccountBridgePersistency {
     return mifosToken;
   }
 
-  public String getStellarAccountPublicKey() {
-    return stellarAccountPublicKey;
+  public String getStellarAccountId() {
+    return stellarAccountId;
   }
 
-  public byte[] getStellarAccountPrivateKey() {
+  public char[] getStellarAccountPrivateKey() {
     return stellarAccountPrivateKey;
   }
 }
