@@ -29,6 +29,9 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/modules")
 public class StellarBridgeController {
+  private static final String API_KEY_HEADER_LABEL = "X-Stellar-Bridge-API-Key";
+  private static final String TENANT_ID_HEADER_LABEL = "X-Mifos-Platform-TenantId";
+
   private final SecurityService securityService;
   private StellarBridgeService stellarBridgeService;
 
@@ -44,13 +47,13 @@ public class StellarBridgeController {
   @RequestMapping(value = "/stellar/payments", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<Void> sendStellarPayment(
-      @RequestHeader("X-Stellar-Bridge-API-Key") final String apiKey,
-      @RequestHeader("X-Mifos-Platform-TenantId") final String mifosTenantId,
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @RequestHeader("X-Mifos-Entity") final String entity,
       @RequestHeader("X-Mifos-Action") final String action,
       @RequestBody final String payload)
       throws InvalidApiKeyException {
-    this.securityService.verifyApiKey(apiKey);
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     if (entity.equalsIgnoreCase("JOURNALENTRY")
         && action.equalsIgnoreCase("CREATE")) {
@@ -65,12 +68,12 @@ public class StellarBridgeController {
   @RequestMapping(value = "/stellar/trustline", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<Void> createTrustLine(
-      @RequestHeader("X-Stellar-Bridge-API-Key") final String apiKey,
-      @RequestHeader("X-Mifos-Platform-TenantId") final String mifosTenantId,
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @RequestBody final TrustLineConfiguration stellarTrustLineConfig)
       throws InvalidStellarAddressException
   {
-    this.securityService.verifyApiKey(apiKey);
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     this.stellarBridgeService.createTrustLine(
         mifosTenantId,
@@ -108,10 +111,10 @@ public class StellarBridgeController {
   @RequestMapping(value = "/stellar/configuration/{mifosTenantId}", method = RequestMethod.DELETE,
                    consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<Void> deleteAccountBridgeConfiguration(
-      @RequestHeader("X-Stellar-Bridge-API-Key") final String apiKey,
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @PathVariable("mifosTenantId") final String mifosTenantId)
   {
-    this.securityService.verifyApiKey(apiKey);
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     if (stellarBridgeService.deleteAccountBridgeConfig(mifosTenantId))
     {
@@ -121,6 +124,32 @@ public class StellarBridgeController {
     {
       return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
+  }
+
+  @RequestMapping(value = "/stellar/account/balance/{assetCode}", method = RequestMethod.GET,
+  consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<String> getStellarAccountBalance(
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @PathVariable("assetCode") final String assetCode)
+  {
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
+
+    return new ResponseEntity<>(
+        stellarBridgeService.getBalance(mifosTenantId, assetCode).toString(),
+        HttpStatus.OK);
+  }
+
+  @RequestMapping(value = "/stellar/account/{secretSeed}/balance/{assetCode}",
+      method = RequestMethod.GET, consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<String> getInstallationAccountBalance(
+      @PathVariable("secretSeed") final String accountSecretSeed,
+      @PathVariable("assetCode") final String assetCode)
+  {
+    return new ResponseEntity<>(
+        stellarBridgeService.getInstallationAccountBalance(accountSecretSeed, assetCode).toString(),
+        HttpStatus.OK);
+
   }
 
   @ExceptionHandler
@@ -155,6 +184,15 @@ public class StellarBridgeController {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public void handleFederationFailedException(
       @SuppressWarnings("unused") final FederationFailedException ex) {
+    //TODO: add message to error.
+  }
+
+  @ExceptionHandler
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public void handleStellarTrustLineCreationFailedException(
+      @SuppressWarnings("unused") final StellarTrustLineCreationFailedException ex)
+  {
+    //TODO: figure out how to communicate missing funds problem to user.
     //TODO: add message to error.
   }
 }

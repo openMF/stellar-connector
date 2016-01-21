@@ -18,12 +18,16 @@ package org.mifos.module.stellar.federation;
 import com.google.common.net.InternetDomainName;
 import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.repository.AccountBridgeRepository;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class LocalFederationService {
+
+  private final Logger logger;
 
   @Value("${stellar.local-federation-domain}")
   private String federationDomain;
@@ -31,7 +35,10 @@ public class LocalFederationService {
   private final AccountBridgeRepository accountBridgeRepository;
 
   @Autowired
-  public LocalFederationService(final AccountBridgeRepository accountBridgeRepository) {
+  public LocalFederationService(
+      @Qualifier("federationServerLogger") final Logger logger,
+      final AccountBridgeRepository accountBridgeRepository) {
+    this.logger = logger;
     this.accountBridgeRepository = accountBridgeRepository;
   }
 
@@ -49,6 +56,8 @@ public class LocalFederationService {
   }
 
   public StellarAccountId getAccountId(final StellarAddress stellarAddress) {
+    logger.debug("getAccountId: %s", stellarAddress);
+
     if (!handlesDomain(stellarAddress.getDomain())) {
       throw FederationFailedException.wrongDomain(stellarAddress.getDomain().toString());
     }
@@ -56,25 +65,25 @@ public class LocalFederationService {
     final String tenantName = stellarAddress.getTenantName();
     final java.util.Optional<String> userAccountId = stellarAddress.getUserAccountId();
 
-    final AccountBridgePersistency accountBridge =
-        accountBridgeRepository.findByMifosTenantId(tenantName);
-
-    if (accountBridge == null)
+    try (final AccountBridgePersistency accountBridge =
+        accountBridgeRepository.findByMifosTenantId(tenantName))
     {
-      throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
-    }
 
-    final String publicKey = accountBridge.getStellarAccountId();
-    //TODO: check here that the public and private keys match. Broken data integrity would mean
-    //TODO: the user would have no access to his or her funds if they don't match.
+      if (accountBridge == null) {
+        throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
+      }
 
-    if (!userAccountId.isPresent()) {
-      return StellarAccountId.mainAccount(publicKey);
-    }
-    else
-    {
-      //TODO: check that an account under this account id actually exists.
-      return StellarAccountId.subAccount(publicKey, userAccountId.get());
+      final String publicKey = accountBridge.getStellarAccountId();
+      //TODO: check here that the public and private keys match. Broken data integrity would mean
+      //TODO: the user would have no access to his or her funds if they don't match.
+
+
+      if (!userAccountId.isPresent()) {
+        return StellarAccountId.mainAccount(publicKey);
+      } else {
+        //TODO: check that an account under this account id actually exists.
+        return StellarAccountId.subAccount(publicKey, userAccountId.get());
+      }
     }
   }
 }

@@ -26,3 +26,4 @@ stellar:
   horizon-address: http://localhost:32769
   installation-account-private-key: SDHOAMBNLGCE2MV5ZKIVZAQD3VCLGP53P3OBSBI6UN5L5XZI5TKHFQL4
   local-federation-domain: mifos-installation.org
+  new-account-initial-balance: 10000

@@ -15,8 +15,11 @@
  */
 package org.mifos.module.stellar.service;
 
+import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
+import org.mifos.module.stellar.repository.AccountBridgeRepository;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
@@ -25,23 +28,40 @@ import java.util.UUID;
 
 @Service
 public class SecurityService {
-  private static final Logger logger = LoggerFactory.getLogger(SecurityService.class);
+  private final AccountBridgeRepository accountBridgeRepository;
+  private final Logger logger;
 
-  public void verifyApiKey(final String apiKey)
-      throws InvalidApiKeyException {
+  @Autowired
+  SecurityService(@Qualifier("stellarBridgeLogger") final Logger logger,
+      final AccountBridgeRepository accountBridgeRepository)
+  {
+    this.logger = logger;
+    this.accountBridgeRepository = accountBridgeRepository;
+  }
 
-    //TODO: actually verify the key.
-    throw new InvalidApiKeyException(apiKey);
+  public void verifyApiKey(final String apiKey, final String mifosTenantId)
+      throws InvalidApiKeyException
+  {
+    try (final AccountBridgePersistency accountBridge =
+        accountBridgeRepository.findByMifosTenantId(mifosTenantId))
+    {
+      if (!accountBridge.getRestApiKey().equals(apiKey)) {
+        throw new InvalidApiKeyException(apiKey);
+      }
+    }
   }
 
   public String generateApiKey() {
     final String randomKey = UUID.randomUUID().toString();
-    try {
+    try
+    {
       return URLEncoder.encode(randomKey, "UTF-8");
-    } catch (final UnsupportedEncodingException e) {
+    }
+    catch (final UnsupportedEncodingException e)
+    {
       //This should never happen.
       logger.error("Could not create API key, reason,", e);
-      throw new UnknownError("unsupported coding exception");
+      throw new UnexpectedException();
     }
   }
 }

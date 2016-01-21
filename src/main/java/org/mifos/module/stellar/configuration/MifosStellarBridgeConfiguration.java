@@ -17,6 +17,8 @@ package org.mifos.module.stellar.configuration;
 
 import com.google.gson.Gson;
 import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.orm.jpa.EntityScan;
 import org.springframework.context.annotation.Bean;
@@ -53,5 +55,15 @@ public class MifosStellarBridgeConfiguration {
   public Gson gson()
   {
     return new Gson();
+  }
+
+  @Bean
+  public Logger stellarBridgeLogger() {
+    return LoggerFactory.getLogger("StellarBridge");
+  }
+
+  @Bean
+  public Logger federationServerLogger() {
+    return LoggerFactory.getLogger("FederationServer");
   }
 }

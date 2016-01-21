@@ -20,7 +20,7 @@ import java.util.Arrays;
 
 @Entity
 @Table(name = "stellar_account_bridge")
-public class AccountBridgePersistency {
+public class AccountBridgePersistency implements AutoCloseable {
   @Id
   @GeneratedValue
   private Long id;
@@ -57,11 +57,6 @@ public class AccountBridgePersistency {
     this.stellarAccountPrivateKey = stellarAccountPrivateKey;
   }
 
-  public void clearSensitiveData()
-  {
-    Arrays.fill(stellarAccountPrivateKey, (char)0);
-  }
-
   public Long getId() {
     return id;
   }
@@ -84,5 +79,10 @@ public class AccountBridgePersistency {
 
   public char[] getStellarAccountPrivateKey() {
     return stellarAccountPrivateKey;
+  }
+
+  @Override public void close() {
+    //Clear sensitive data.
+    Arrays.fill(stellarAccountPrivateKey, (char)0);
   }
 }

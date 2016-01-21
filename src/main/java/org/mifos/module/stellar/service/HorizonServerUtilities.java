@@ -15,6 +15,9 @@
  */
 package org.mifos.module.stellar.service;
 
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.stellar.base.*;
@@ -23,9 +26,12 @@ import org.stellar.sdk.Server;
 import org.stellar.sdk.SubmitTransactionResponse;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
 @Component
 public class HorizonServerUtilities {
+
+  private final Logger logger;
 
   @Value("${stellar.horizon-address}")
   private String serverAddress;
@@ -34,9 +40,18 @@ public class HorizonServerUtilities {
   private String installationAccountPrivateKey;
   //TODO: keeping installationAccountPrivateKey as String? Should this be removed from memory?
 
+  @Value("${stellar.new-account-initial-balance}")
+  private int initialBalance = 20;
+
+  @Autowired
+  HorizonServerUtilities(@Qualifier("stellarBridgeLogger")final Logger logger)
+  {
+    this.logger = logger;
+  }
+
   /**
    * Create an account on the stellar server to be used by a Mifos tenant.  This account will
-   * need a minimum balance of 20 lumens, to be derived from the installation account.
+   * need a minimum initial balance of 20 lumens, to be derived from the installation account.
    *
    * @return The KeyPair of the account which was created.
    *
@@ -57,6 +72,8 @@ public class HorizonServerUtilities {
 
     createAccountForKeyPair(newTenantStellarAccountKeyPair, server, installationAccountKeyPair,
         installationAccount);
+
+    //TODO: setup inflation voting for the new account.
 
     return newTenantStellarAccountKeyPair;
   }
@@ -125,9 +142,15 @@ public class HorizonServerUtilities {
   {
     final Transaction.Builder transactionBuilder = new Transaction.Builder(installationAccount);
 
+    int initialBalance = Math.max(this.initialBalance, 20);
+    if (initialBalance != this.initialBalance) {
+      logger.info("Initial balance cannot be lower than 20.  Configured value is being ignored: %i",
+          this.initialBalance);
+    }
+
     final CreateAccountOperation createAccountOperation =
         new CreateAccountOperation.Builder(newAccountKeyPair,
-              Integer.toString(20)).
+              Integer.toString(initialBalance)).
             setSourceAccount(installationAccountKeyPair).build();
 
     transactionBuilder.addOperation(createAccountOperation);
@@ -163,5 +186,28 @@ public class HorizonServerUtilities {
       throw InvalidConfigurationException.invalidInstallationAccountSecretSeed();
     }
     return installationAccount;
+  }
+
+  public BigDecimal getBalance(final char[] stellarAccountPrivateKey, final String assetCode) {
+    final Server server = new Server(serverAddress);
+    final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
+
+    final Account tenantAccount = getAccount(server, accountKeyPair);
+    final Account.Balance[] balances = tenantAccount.getBalances();
+
+    BigDecimal totalFromAllIssuers = BigDecimal.ZERO;
+    for (final Account.Balance balance : balances)
+    {
+      if (balance.getBalance() != null &&
+          ((balance.getAssetCode() != null && balance.getAssetCode().equals(assetCode)) ||
+            ((balance.getAssetType().equals("native")) && assetCode.equals("XLM"))))
+      {
+
+        totalFromAllIssuers =
+            totalFromAllIssuers.add(BigDecimal.valueOf(Double.parseDouble(balance.getBalance())));
+      }
+    }
+
+    return totalFromAllIssuers;
   }
 }
