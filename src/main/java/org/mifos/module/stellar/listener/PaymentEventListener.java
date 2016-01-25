@@ -15,11 +15,18 @@
  */
 package org.mifos.module.stellar.listener;
 
-import com.google.gson.Gson;
+import org.mifos.module.stellar.federation.FederationFailedException;
+import org.mifos.module.stellar.federation.InvalidStellarAddressException;
+import org.mifos.module.stellar.federation.StellarAccountId;
+import org.mifos.module.stellar.federation.StellarAddress;
 import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
+import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.repository.AccountBridgeRepository;
-import org.mifos.module.stellar.restdomain.PaymentEventPayload;
+import org.mifos.module.stellar.service.HorizonServerUtilities;
+import org.mifos.module.stellar.service.StellarAddressResolver;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
 
@@ -27,25 +34,48 @@ import org.springframework.stereotype.Component;
 public class PaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
 
   private final AccountBridgeRepository accountBridgeRepository;
-  private final Gson gsonParser;
+  private final HorizonServerUtilities horizonServerUtilities;
+  private final StellarAddressResolver stellarAddressResolver;
+  private final Logger logger;
 
   @Autowired
   public PaymentEventListener(
       final AccountBridgeRepository accountBridgeRepository,
-      final Gson gsonParser) {
+      final HorizonServerUtilities horizonServerUtilities,
+      final StellarAddressResolver stellarAddressResolver,
+      final @Qualifier("stellarBridgeLogger")Logger logger) {
     this.accountBridgeRepository = accountBridgeRepository;
-    this.gsonParser = gsonParser;
+    this.horizonServerUtilities = horizonServerUtilities;
+    this.stellarAddressResolver = stellarAddressResolver;
+    this.logger = logger;
   }
 
-  @Override public void onApplicationEvent(final MifosPaymentEvent event) {
+  @Override public void onApplicationEvent(final MifosPaymentEvent event)
+      throws InvalidStellarAddressException, FederationFailedException
+  {
+    final PaymentPersistency paymentPayload = event.getPayload();
+    final StellarAccountId targetAccountId;
+    try {
+      targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(StellarAddress.parse(paymentPayload.targetAccount));
+    }
+    catch (final InvalidStellarAddressException | FederationFailedException ex)
+    {
+      logger.error("Federation failed on the address: " + paymentPayload.targetAccount);
+      throw ex;
+      //TODO: decide what to do with the event.  Retry? In which cases?
+    }
 
-    final PaymentEventPayload paymentEventPayload =
-        gsonParser.fromJson(event.getPayload(), PaymentEventPayload.class);
+    try (final AccountBridgePersistency accountBridge =
+        accountBridgeRepository.findByMifosTenantId(paymentPayload.sourceTenantId))
+    {
+      horizonServerUtilities.pay(
+          targetAccountId,
+          paymentPayload.amount,
+          paymentPayload.assetCode,
+          accountBridge.getStellarAccountPrivateKey());
 
-    final AccountBridgePersistency accountBridgePersistency =
-        accountBridgeRepository.findByMifosTenantId(event.getTenantId());
-
-
-
+      //TODO: adjust mifos balance
+      //TODO: Mark event as processed
+    }
   }
 }

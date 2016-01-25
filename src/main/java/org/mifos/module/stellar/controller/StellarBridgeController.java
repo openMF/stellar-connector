@@ -15,10 +15,13 @@
  */
 package org.mifos.module.stellar.controller;
 
+import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.FederationFailedException;
 import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAddress;
+import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.restdomain.AccountBridgeConfiguration;
+import org.mifos.module.stellar.restdomain.JournalEntryData;
 import org.mifos.module.stellar.restdomain.TrustLineConfiguration;
 import org.mifos.module.stellar.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,14 +37,20 @@ public class StellarBridgeController {
 
   private final SecurityService securityService;
   private StellarBridgeService stellarBridgeService;
+  private final JournalEntryPaymentMapper journalEntryPaymentMapper;
+  private final Gson gson;
 
   @Autowired
   public StellarBridgeController(
       final SecurityService securityService,
-      final StellarBridgeService stellarBridgeService)
+      final StellarBridgeService stellarBridgeService,
+      final JournalEntryPaymentMapper journalEntryPaymentMapper,
+      final Gson gson)
   {
     this.securityService = securityService;
     this.stellarBridgeService = stellarBridgeService;
+    this.journalEntryPaymentMapper = journalEntryPaymentMapper;
+    this.gson = gson;
   }
 
   @RequestMapping(value = "/stellar/payments", method = RequestMethod.POST,
@@ -56,18 +65,23 @@ public class StellarBridgeController {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     if (entity.equalsIgnoreCase("JOURNALENTRY")
-        && action.equalsIgnoreCase("CREATE")) {
+        && action.equalsIgnoreCase("CREATE"))
+    {
+      final JournalEntryData journalEntry = gson.fromJson(payload, JournalEntryData.class);
 
-      this.stellarBridgeService.sendPaymentToStellar(mifosTenantId, payload);
+      final PaymentPersistency payment =
+          journalEntryPaymentMapper.mapToPayment(mifosTenantId, journalEntry);
+
+      this.stellarBridgeService.sendPaymentToStellar(payment);
     }
 
 
     return new ResponseEntity<>(HttpStatus.OK);
   }
 
-  @RequestMapping(value = "/stellar/trustline", method = RequestMethod.POST,
+  @RequestMapping(value = "/stellar/creditline", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<Void> createTrustLine(
+  public ResponseEntity<Void> createCreditLine(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @RequestBody final TrustLineConfiguration stellarTrustLineConfig)
@@ -75,7 +89,7 @@ public class StellarBridgeController {
   {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
-    this.stellarBridgeService.createTrustLine(
+    this.stellarBridgeService.createCreditLine(
         mifosTenantId,
         StellarAddress.parse(stellarTrustLineConfig.getTrustedAccount()),
         stellarTrustLineConfig.getTrustedCurrency(),
@@ -190,7 +204,7 @@ public class StellarBridgeController {
   @ExceptionHandler
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public void handleStellarTrustLineCreationFailedException(
-      @SuppressWarnings("unused") final StellarTrustLineCreationFailedException ex)
+      @SuppressWarnings("unused") final StellarCreditLineCreationFailedException ex)
   {
     //TODO: figure out how to communicate missing funds problem to user.
     //TODO: add message to error.

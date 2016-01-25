@@ -55,7 +55,9 @@ public class LocalFederationService {
     return domain.equals(federationDomainName);
   }
 
-  public StellarAccountId getAccountId(final StellarAddress stellarAddress) {
+  public StellarAccountId getAccountId(final StellarAddress stellarAddress)
+      throws FederationFailedException
+  {
     logger.debug("getAccountId: %s", stellarAddress);
 
     if (!handlesDomain(stellarAddress.getDomain())) {

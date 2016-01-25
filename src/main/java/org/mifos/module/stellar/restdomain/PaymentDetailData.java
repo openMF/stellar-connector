@@ -13,8 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.restdomain;
 
-public class UnexpectedException extends RuntimeException {
-  //TODO: do I really need this? And am I using it where I should?
+public class PaymentDetailData {
+  //private Long id;
+  //private PaymentTypeData paymentType;
+  public String accountNumber;
+  //private String checkNumber;
+  //private String routingCode;
+  //private String receiptNumber;
+  public String bankNumber;
 }

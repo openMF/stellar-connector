@@ -15,5 +15,10 @@
  */
 package org.mifos.module.stellar.restdomain;
 
-public class PaymentEventPayload {
+
+public class TransactionDetailData {
+  //private Long transactionId;
+  public PaymentDetailData paymentDetails;
+  //private NoteData noteData;
+  //private TransactionTypeEnumData transactionType;
 }

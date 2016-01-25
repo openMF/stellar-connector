@@ -44,7 +44,7 @@ public class FederationResponse {
       final String accountId,
       final String userAccount)
   {
-    return new FederationResponse(stellarAddress, accountId, "id", userAccount);
+    return new FederationResponse(stellarAddress, accountId, "text", userAccount);
   }
 
   public static FederationResponse account(
@@ -66,10 +66,6 @@ public class FederationResponse {
     this.memo = memo;
   }
 
-  public String getMemo() {
-    return memo;
-  }
-
   @SuppressWarnings("unused")
   public String getStellarAddress() { return stellarAddress; }
 
@@ -79,5 +75,9 @@ public class FederationResponse {
 
   public String getMemoType() {
     return memoType;
+  }
+
+  public String getMemo() {
+    return memo;
   }
 }

@@ -15,26 +15,23 @@
  */
 package org.mifos.module.stellar.listener;
 
+import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.springframework.context.ApplicationEvent;
 
 public class MifosPaymentEvent extends ApplicationEvent{
 
   private final Long eventId;
 
-  private final String tenantId;
-
-  private final String payload;
+  private final PaymentPersistency payment;
 
   public MifosPaymentEvent(
       final Object source,
       final Long eventId,
-      final String mifosTenantId,
-      final String payload) {
+      final PaymentPersistency payment) {
     super(source);
 
     this.eventId = eventId;
-    this.tenantId = mifosTenantId;
-    this.payload = payload;
+    this.payment = payment;
   }
 
   @SuppressWarnings("unused")
@@ -42,11 +39,7 @@ public class MifosPaymentEvent extends ApplicationEvent{
     return eventId;
   }
 
-  public String getTenantId() {
-    return tenantId;
-  }
-
-  public String getPayload() {
-    return payload;
+  public PaymentPersistency getPayload() {
+    return payment;
   }
 }

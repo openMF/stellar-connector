@@ -13,8 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.persistencedomain;
 
-public class UnexpectedException extends RuntimeException {
-  //TODO: do I really need this? And am I using it where I should?
+import java.math.BigDecimal;
+
+public class PaymentPersistency {
+  public String sourceTenantId;
+  public String assetCode;
+  public BigDecimal amount;
+  public String sinkDomain;
+  public String targetAccount;
+  public String targetSubAccount;
 }

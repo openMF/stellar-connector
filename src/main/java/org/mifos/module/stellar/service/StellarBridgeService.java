@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 package org.mifos.module.stellar.service;
+import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.*;
 import org.mifos.module.stellar.listener.MifosPaymentEvent;
 import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.repository.AccountBridgeRepository;
 import org.mifos.module.stellar.repository.MifosEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,25 +33,25 @@ import java.util.Date;
 
 @Service
 public class StellarBridgeService implements ApplicationEventPublisherAware {
+  private final StellarAddressResolver stellarAddressResolver;
   private ApplicationEventPublisher eventPublisher;
   private final MifosEventRepository mifosEventRepository;
   private final AccountBridgeRepository accountBridgeRepository;
   private final HorizonServerUtilities horizonServerUtilities;
-  private final LocalFederationService localfederationService;
-  private final ExternalFederationService externalFederationService;
+  private final Gson gson;
 
   @Autowired
   public StellarBridgeService(
       final MifosEventRepository mifosEventRepository,
       final AccountBridgeRepository accountBridgeRepository,
       final HorizonServerUtilities horizonServerUtilities,
-      final LocalFederationService localfederationService,
-      final ExternalFederationService externalFederationService) {
+      final Gson gson,
+      final StellarAddressResolver stellarAddressResolver) {
     this.mifosEventRepository = mifosEventRepository;
     this.accountBridgeRepository = accountBridgeRepository;
     this.horizonServerUtilities = horizonServerUtilities;
-    this.localfederationService = localfederationService;
-    this.externalFederationService = externalFederationService;
+    this.gson = gson;
+    this.stellarAddressResolver = stellarAddressResolver;
   }
 
   @Override
@@ -93,43 +95,34 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
    * Create a trustline from a Mifos account to the specified Stellar account.  This means
    * that the stellar account can transfer money to the Mifos account.
    *
-   * @param mifosTenantId The mifos tenant that wants to extend trust.
+   * @param mifosTenantId The mifos tenant that wants to extend the credit line.
    * @param stellarAddressToTrust The stellar address (in form jed*stellar.org) that
-   *                              receives the trust.
-   * @param currency The currency in which to extend trust.
+   *                              receives the credit line.
+   * @param currency The currency in which to extend credit.
    * @param maximumAmount the maximum amount of currency to trust from this source.
    */
-  public void createTrustLine(
+  public void createCreditLine(
       final String mifosTenantId,
       final StellarAddress stellarAddressToTrust,
       final String currency,
       final long maximumAmount)
       throws InvalidStellarAddressException,
-      FederationFailedException,
-      StellarTrustLineCreationFailedException,
+      FederationFailedException, StellarCreditLineCreationFailedException,
       InvalidConfigurationException
   {
     try (final AccountBridgePersistency accountBridge =
         this.accountBridgeRepository.findByMifosTenantId(mifosTenantId)) {
 
-      final StellarAccountId accountIdOfStellarAccountToTrust = getAccountIdOfStellarAccount(stellarAddressToTrust);
+      final StellarAccountId accountIdOfStellarAccountToTrust =
+          stellarAddressResolver.getAccountIdOfStellarAccount(stellarAddressToTrust);
 
       if (accountIdOfStellarAccountToTrust.getSubAccount().isPresent()) {
-        throw StellarTrustLineCreationFailedException.needTopLevelStellarAccount(stellarAddressToTrust.toString());
+        throw StellarCreditLineCreationFailedException.needTopLevelStellarAccount(stellarAddressToTrust.toString());
       }
 
-      horizonServerUtilities.createTrustLine(accountBridge.getStellarAccountPrivateKey(),
+      horizonServerUtilities.createCreditLine(accountBridge.getStellarAccountPrivateKey(),
           accountIdOfStellarAccountToTrust.getPublicKey(), currency, maximumAmount);
 
-    }
-  }
-
-  private StellarAccountId getAccountIdOfStellarAccount(final StellarAddress stellarAddress) {
-    if (localfederationService.handlesDomain(stellarAddress.getDomain())) {
-      return localfederationService.getAccountId(stellarAddress);
-    }
-    else {
-      return externalFederationService.getAccountId(stellarAddress);
     }
   }
 
@@ -160,17 +153,19 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
   }
 
   public void sendPaymentToStellar(
-      final String mifosTenantId,
-      final String payload)
+      final PaymentPersistency payment)
   {
-    final Long eventId = this.saveEvent(mifosTenantId, payload);
+    final Long eventId = this.saveEvent(payment);
 
-    this.eventPublisher.publishEvent(new MifosPaymentEvent(this, eventId, mifosTenantId, payload));
+    this.eventPublisher.publishEvent(new MifosPaymentEvent(this, eventId, payment));
+
+    //TODO: still need to ensure replaying of unplayed events.
   }
 
-  private Long saveEvent(final String mifosTenantId, final String payload) {
+  private Long saveEvent(final PaymentPersistency payment) {
     final MifosEventPersistency eventSource = new MifosEventPersistency();
-    eventSource.setTenantId(mifosTenantId);
+
+    final String payload = gson.toJson(payment);
     eventSource.setPayload(payload);
     eventSource.setProcessed(Boolean.FALSE);
     final Date now = new Date();

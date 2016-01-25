@@ -15,6 +15,5 @@
  */
 package org.mifos.module.stellar.service;
 
-public class UnexpectedException extends RuntimeException {
-  //TODO: do I really need this? And am I using it where I should?
+public class StellarPaymentFailedException extends RuntimeException {
 }

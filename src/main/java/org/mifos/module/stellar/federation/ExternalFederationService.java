@@ -131,8 +131,10 @@ public class ExternalFederationService {
     return convertFederationResponseToStellarAddress(response);
   }
 
-  private StellarAccountId convertFederationResponseToStellarAddress(FederationResponse response) {
-    if (response.getMemoType().equalsIgnoreCase("id"))
+  private StellarAccountId convertFederationResponseToStellarAddress(
+      final FederationResponse response)
+  {
+    if (response.getMemoType().equalsIgnoreCase("text"))
     {
       return StellarAccountId.subAccount(response.getAccountId(), response.getMemo());
     }

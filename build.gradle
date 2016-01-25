@@ -43,7 +43,7 @@ dependencies {
     compile('com.squareup.retrofit:retrofit:1.9.0')
     compile("com.google.code.gson:gson:2.2.4")
     compile("com.google.guava:guava:19.0")
-    compile("com.github.stellar:java-stellar-sdk:0.0.7")
+    compile("com.github.stellar:java-stellar-sdk:0.0.8")
     compile("com.moandjiezana.toml:toml4j:0.4.0")
     testCompile("org.springframework.boot:spring-boot-starter-test")
     testCompile("junit:junit:4.12")

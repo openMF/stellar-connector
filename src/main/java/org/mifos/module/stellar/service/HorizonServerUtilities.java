@@ -15,6 +15,7 @@
  */
 package org.mifos.module.stellar.service;
 
+import org.mifos.module.stellar.federation.StellarAccountId;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,6 +28,8 @@ import org.stellar.sdk.SubmitTransactionResponse;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Optional;
 
 @Component
 public class HorizonServerUtilities {
@@ -91,14 +94,16 @@ public class HorizonServerUtilities {
    * @throws InvalidConfigurationException if the horizon server named in the configuration cannot
    * be reached.  Either the address is wrong or the horizon server named is't running, or there is
    * a problem with the network.
-   * @throws StellarTrustLineCreationFailedException if the creation of the trustline failed for any
+   * @throws StellarCreditLineCreationFailedException if the creation of the trustline failed for any
    * other reason.
    */
-  void createTrustLine(
+  void createCreditLine(
       final char[] stellarAccountPrivateKey,
       final String addressOfStellarAccountToTrust,
       final String currency,
-      final long maximumAmount) throws InvalidConfigurationException, StellarTrustLineCreationFailedException {
+      final long maximumAmount)
+      throws InvalidConfigurationException, StellarCreditLineCreationFailedException
+  {
 
     final Server server = new Server(serverAddress);
 
@@ -116,7 +121,15 @@ public class HorizonServerUtilities {
     final ChangeTrustOperation trustOperation =
         new ChangeTrustOperation.Builder(assetToTrust, Long.toString(maximumAmount)).build();
 
+    final Asset inverseAsset = Asset.createNonNativeAsset(currency, trustingAccountKeyPair);
+
+    final ManageOfferOperation offerOperation =
+        new ManageOfferOperation.Builder(inverseAsset, assetToTrust,
+            Long.toString(maximumAmount), Long.toString(maximumAmount)).build();
+
     trustTransactionBuilder.addOperation(trustOperation);
+    trustTransactionBuilder.addOperation(offerOperation);
+
     final Transaction trustTransaction = trustTransactionBuilder.build();
 
     trustTransaction.sign(trustingAccountKeyPair);
@@ -126,8 +139,9 @@ public class HorizonServerUtilities {
           server.submitTransaction(trustTransaction);
       if (!createTrustLineResponse.isSuccess())
       {
-        throw StellarTrustLineCreationFailedException.trustLineTransactionFailed();
+        throw StellarCreditLineCreationFailedException.trustLineTransactionFailed();
       }
+      //TODO: find a way to communicate back fees
     } catch (IOException e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
     }
@@ -188,26 +202,140 @@ public class HorizonServerUtilities {
     return installationAccount;
   }
 
-  public BigDecimal getBalance(final char[] stellarAccountPrivateKey, final String assetCode) {
+  public void pay(
+      final StellarAccountId targetAccountId,
+      final BigDecimal amount,
+      final String assetCode,
+      final char[] stellarAccountPrivateKey)
+      throws InvalidConfigurationException, StellarPaymentFailedException
+  {
+    final Server server = new Server(serverAddress);
+    final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
+    final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
+
+    final Asset sendAsset = Asset.createNonNativeAsset(assetCode, sourceAccountKeyPair);
+    final Asset receiveAsset = Asset.createNonNativeAsset(assetCode, targetAccountKeyPair);
+
+    final Account sourceAccount;
+    final BigDecimal balanceOfAssetCreditsFromTarget;
+    try {
+      sourceAccount = server.accounts().account(sourceAccountKeyPair);
+      balanceOfAssetCreditsFromTarget = getBalanceOfCreditsInAsset(sourceAccount, receiveAsset);
+
+    }
+    catch (final IOException e) {
+      throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
+    }
+
+    final Transaction.Builder transferTransactionBuilder = new Transaction.Builder(sourceAccount);
+    final PathPaymentOperation paymentOperation =
+        new PathPaymentOperation.Builder(
+            sendAsset,
+            bigDecimalToStellarBalance(amount), //TODO:???
+            targetAccountKeyPair,
+            receiveAsset,
+            bigDecimalToStellarBalance(amount))
+            .setSourceAccount(sourceAccountKeyPair).build();
+
+    transferTransactionBuilder.addOperation(paymentOperation);
+
+    if (!balanceOfAssetCreditsFromTarget.equals(BigDecimal.ZERO))
+    {
+      final ManageOfferOperation tradeOfferOperation =
+          new ManageOfferOperation.Builder(
+              receiveAsset,
+              sendAsset,
+              bigDecimalToStellarBalance(balanceOfAssetCreditsFromTarget),
+              bigDecimalToStellarBalance(balanceOfAssetCreditsFromTarget))
+              .setSourceAccount(sourceAccountKeyPair)
+              .build();
+      transferTransactionBuilder.addOperation(tradeOfferOperation);
+    }
+
+    if (targetAccountId.getSubAccount().isPresent())
+    {
+      final Memo subAccountMemo = Memo.text(targetAccountId.getSubAccount().get());
+      transferTransactionBuilder.addMemo(subAccountMemo);
+    }
+
+    final Transaction transferTransaction = transferTransactionBuilder.build();
+    transferTransaction.sign(sourceAccountKeyPair);
+
+
+    try {
+      final SubmitTransactionResponse paymentResponse = server.submitTransaction(transferTransaction);
+      if (!paymentResponse.isSuccess())
+      {
+        throw new StellarPaymentFailedException();
+      }
+      //TODO: find a way to communicate back fees
+    } catch (IOException e) {
+      throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
+    }
+  }
+
+  public BigDecimal getBalance(
+      final char[] stellarAccountPrivateKey,
+      final String assetCode)
+  {
     final Server server = new Server(serverAddress);
     final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
 
     final Account tenantAccount = getAccount(server, accountKeyPair);
     final Account.Balance[] balances = tenantAccount.getBalances();
 
-    BigDecimal totalFromAllIssuers = BigDecimal.ZERO;
-    for (final Account.Balance balance : balances)
-    {
-      if (balance.getBalance() != null &&
-          ((balance.getAssetCode() != null && balance.getAssetCode().equals(assetCode)) ||
-            ((balance.getAssetType().equals("native")) && assetCode.equals("XLM"))))
-      {
+    return Arrays.asList(balances).stream()
+        .filter(balance -> balanceIsInAsset(balance, assetCode))
+        .map(balance -> stellarBalanceToBigDecimal(balance.getBalance()))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
 
-        totalFromAllIssuers =
-            totalFromAllIssuers.add(BigDecimal.valueOf(Double.parseDouble(balance.getBalance())));
-      }
+  private BigDecimal getBalanceOfCreditsInAsset(
+      final Account sourceAccount,
+      final Asset asset)
+  {
+    final Optional<BigDecimal> balanceOfGivenAsset
+        = Arrays.asList(sourceAccount.getBalances()).stream()
+        .filter(balance -> getAssetOfBalance(balance).equals(asset))
+        .map(balance -> stellarBalanceToBigDecimal(balance.getBalance()))
+        .max(BigDecimal::compareTo);
+
+    //Theoretically there shouldn't be more than one balance, but if this should turn out to be
+    //incorrect, we return the largest one, rather than adding them together.
+
+    return balanceOfGivenAsset.orElse(BigDecimal.ZERO);
+  }
+
+  private boolean balanceIsInAsset(
+      final Account.Balance balance, final String assetCode)
+  {
+    if (balance.getAssetType() == null)
+      return false;
+
+    if (balance.getAssetCode() == null) {
+      return assetCode.equals("XLM") && balance.getAssetType().equals("native");
     }
 
-    return totalFromAllIssuers;
+    return balance.getAssetCode().equals(assetCode);
+  }
+
+  private Asset getAssetOfBalance(
+      final Account.Balance balance)
+  {
+    if (balance.getAssetCode() == null)
+      return new AssetTypeNative();
+    else
+      return Asset.createNonNativeAsset(balance.getAssetCode(),
+        KeyPair.fromSecretSeed(balance.getAssetIssuer()));
+  }
+
+  private BigDecimal stellarBalanceToBigDecimal(final String balance)
+  {
+    return BigDecimal.valueOf(Double.parseDouble(balance));
+  }
+
+  private String bigDecimalToStellarBalance(final BigDecimal balance)
+  {
+    return balance.toString();
   }
 }

@@ -15,18 +15,18 @@
  */
 package org.mifos.module.stellar.service;
 
-public class StellarTrustLineCreationFailedException extends RuntimeException {
-  private StellarTrustLineCreationFailedException(final String message) {
+public class StellarCreditLineCreationFailedException extends RuntimeException {
+  private StellarCreditLineCreationFailedException(final String message) {
     super(message);
   }
 
-  public static StellarTrustLineCreationFailedException needTopLevelStellarAccount
+  public static StellarCreditLineCreationFailedException needTopLevelStellarAccount
       (final String address) {
-    return new StellarTrustLineCreationFailedException(
+    return new StellarCreditLineCreationFailedException(
         "Need top level Stellar account to create trustline: " + address);
   }
 
-  public static StellarTrustLineCreationFailedException trustLineTransactionFailed() {
-    return new StellarTrustLineCreationFailedException("Trustline creation failed.");
+  public static StellarCreditLineCreationFailedException trustLineTransactionFailed() {
+    return new StellarCreditLineCreationFailedException("Trustline creation failed.");
   }
 }

@@ -26,9 +26,6 @@ public class MifosEventPersistency {
   @GeneratedValue
   private Long id;
 
-  @Column(name = "tenant_id")
-  private String tenantId;
-
   @Column(name = "payload")
   private String payload;
 
@@ -53,14 +50,6 @@ public class MifosEventPersistency {
 
   public void setId(Long id) {
     this.id = id;
-  }
-
-  public String getTenantId() {
-    return tenantId;
-  }
-
-  public void setTenantId(String tenantId) {
-    this.tenantId = tenantId;
   }
 
   public String getPayload() {

@@ -137,7 +137,7 @@ public class ExternalFederationServiceTest {
         .addressDomainUrl("https://x.org/.well-known/stellar.toml")
         .federationServerApi("https://api.x.org/federation")
         .expectedPublicKey("G12351354")
-        .outputtedMemoType("id")
+        .outputtedMemoType("text")
         .outputtedMemo("xyz")
         .expectedSubAccount("xyz")
     );
@@ -147,7 +147,16 @@ public class ExternalFederationServiceTest {
         .addressDomainUrl("https://x.org/.well-known/stellar.toml")
         .federationServerApi("https://api.x.org/federation")
         .expectedPublicKey("G12351354")
-        .outputtedMemoType("hash") //Only id type is currently supported.
+        .outputtedMemoType("hash") //Only text type is currently supported.
+        .exceptionExpected(true)
+    );
+
+    ret.add(new TestCase()
+        .inputtedStellarAddress("x*x.org")
+        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
+        .federationServerApi("https://api.x.org/federation")
+        .expectedPublicKey("G12351354")
+        .outputtedMemoType("id") //Only text type is currently supported.
         .exceptionExpected(true)
     );
 

@@ -13,8 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.restdomain;
 
-public class UnexpectedException extends RuntimeException {
-  //TODO: do I really need this? And am I using it where I should?
+
+public class CurrencyData {
+  public String code;
+  //private String name;
+  //private int decimalPlaces;
+  public Integer inMultiplesOf;
+  //private String displaySymbol;
+  //private String nameCode;
+  //private String displayLabel;
 }
