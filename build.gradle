@@ -49,6 +49,7 @@ dependencies {
     testCompile("junit:junit:4.12")
     testCompile("org.jmock:jmock-junit4:2.8.1")
     testCompile("org.jmock:jmock-legacy:2.8.1")
+    testCompile("com.spotify:docker-client:3.3.5")
 }
 
 task wrapper(type: Wrapper) {
