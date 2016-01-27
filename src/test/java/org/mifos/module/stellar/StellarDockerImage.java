@@ -15,89 +15,39 @@
  */
 package org.mifos.module.stellar;
 
-import com.spotify.docker.client.DefaultDockerClient;
-import com.spotify.docker.client.DockerCertificateException;
-import com.spotify.docker.client.DockerClient;
-import com.spotify.docker.client.DockerException;
-import com.spotify.docker.client.messages.ContainerConfig;
-import com.spotify.docker.client.messages.ContainerCreation;
-import com.spotify.docker.client.messages.HostConfig;
-import com.spotify.docker.client.messages.PortBinding;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.core.DockerClientBuilder;
+import com.github.dockerjava.core.command.PullImageResultCallback;
 
-import java.util.Collections;
+import java.io.IOException;
 
 public class StellarDockerImage implements AutoCloseable {
 
-  static class StellarDockerImageException extends Exception
-  {
-    StellarDockerImageException(final String msg) { super(msg);}
-  }
-
   public static final String STELLAR_DOCKER_IMAGE = "stellar/stellar-core-horizon:latest";
 
-  final DockerClient docker;
-  final String stellarContainerId;
+  final DockerClient dockerClient;
+  final String stellarDockerContainerId;
 
-  public StellarDockerImage() throws StellarDockerImageException {
-    try {
-      docker = DefaultDockerClient.fromEnv().build();
-    } catch (final DockerCertificateException e) {
-      throw new StellarDockerImageException("docker environment creation failed in certification.");
-    }
+  public StellarDockerImage() {
+    dockerClient = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build();
 
-    try {
-      docker.pull(STELLAR_DOCKER_IMAGE);
-    } catch (final DockerException e) {
-      throw new StellarDockerImageException("pulling stellar docker image failed.");
-    } catch (final InterruptedException e) {
-      throw new StellarDockerImageException("pulling stellar docker image was interrupted.");
-    }
+    dockerClient.pullImageCmd(STELLAR_DOCKER_IMAGE).exec(new PullImageResultCallback()).awaitSuccess();
 
-    final PortBinding portBinding = PortBinding.randomPort("0.0.0.0");
-    try {
-      final HostConfig stellarDockerHostConfig = HostConfig.builder()
-          .portBindings(Collections.singletonMap("8000", Collections.singletonList(portBinding)))
-          .build();
-      final ContainerConfig stellarContainerConfig = ContainerConfig.builder()
-          .hostConfig(stellarDockerHostConfig)
-          .attachStdin(false)
-          .attachStdout(false)
-          .attachStderr(false)
-          .build();
+    final CreateContainerResponse container = dockerClient
+        .createContainerCmd(STELLAR_DOCKER_IMAGE)
+        .withAttachStderr(false)
+        .withAttachStdin(false)
+        .withAttachStdout(false)
+        .exec();
 
-      final ContainerCreation stellarContainerCreation = docker.createContainer(stellarContainerConfig);
-      stellarContainerId = stellarContainerCreation.id();
-    } catch (final DockerException e) {
-      throw new StellarDockerImageException("creating stellar docker container failed.");
-    } catch (final InterruptedException e) {
-      throw new StellarDockerImageException("creating stellar docker container was interrupted.");
-    }
-
-    try {
-      docker.startContainer(stellarContainerId);
-    } catch (final DockerException e) {
-      throw new StellarDockerImageException("starting stellar docker image failed");
-    } catch (final InterruptedException e) {
-      throw new StellarDockerImageException("starting stellar docker image was interrupted.");
-    }
+    stellarDockerContainerId = container.getId();
+    dockerClient.startContainerCmd(stellarDockerContainerId).exec();
   }
 
-  @Override public void close() throws StellarDockerImageException{
-    try {
-      docker.killContainer(stellarContainerId);
-    } catch (final DockerException e) {
-      throw new StellarDockerImageException("killing stellar docker container failed.");
-    } catch (final InterruptedException e) {
-      throw new StellarDockerImageException("killing stellar docker container was interrupted.");
-    }
-
-    try {
-      docker.removeContainer(stellarContainerId);
-    } catch (final DockerException e) {
-      throw new StellarDockerImageException("removing stellar docker container failed.");
-    } catch (final InterruptedException e) {
-      throw new StellarDockerImageException("removing stellar docker container was interrupted.");
-    }
-    docker.close();
+  @Override public void close() throws IOException {
+    dockerClient.stopContainerCmd(stellarDockerContainerId).exec();
+    dockerClient.removeContainerCmd(stellarDockerContainerId).exec();
+    dockerClient.close();
   }
 }
