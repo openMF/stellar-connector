@@ -13,28 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.restdomain;
+package org.mifos.module.stellar.persistencedomain;
 
-public class AccountBridgeConfiguration {
 
+import javax.persistence.*;
+
+@Entity
+@Table(name = "stellar_account_bridge_key")
+public class AccountBridgeKeyPersistency {
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @Column(name = "rest_api_key")
+  private String restApiKey;
+
+  @Column(name = "mifos_tenant_id")
   private String mifosTenantId;
 
-  private String mifosToken;
+  @SuppressWarnings("unused")
+  public AccountBridgeKeyPersistency() {}
 
-  @SuppressWarnings("unused") //needed for Json Mapping.
-  AccountBridgeConfiguration() {super();}
+  public AccountBridgeKeyPersistency(
+      final String restApiKey,
+      final String mifosTenantId)
 
-  public AccountBridgeConfiguration(final String mifosTenantId, final String mifosToken)
   {
+
+    this.restApiKey = restApiKey;
     this.mifosTenantId = mifosTenantId;
-    this.mifosToken = mifosToken;
+  }
+
+  public Long getId() {
+    return id;
+  }
+
+  public String getRestApiKey() {
+    return restApiKey;
   }
 
   public String getMifosTenantId() {
     return mifosTenantId;
-  }
-
-  public String getMifosToken() {
-    return mifosToken;
   }
 }

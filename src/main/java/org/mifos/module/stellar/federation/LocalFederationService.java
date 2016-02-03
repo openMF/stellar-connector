@@ -67,25 +67,23 @@ public class LocalFederationService {
     final String tenantName = stellarAddress.getTenantName();
     final java.util.Optional<String> userAccountId = stellarAddress.getUserAccountId();
 
-    try (final AccountBridgePersistency accountBridge =
-        accountBridgeRepository.findByMifosTenantId(tenantName))
-    {
+    final AccountBridgePersistency accountBridge =
+        accountBridgeRepository.findByMifosTenantId(tenantName);
 
-      if (accountBridge == null) {
-        throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
-      }
+    if (accountBridge == null) {
+      throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
+    }
 
-      final String publicKey = accountBridge.getStellarAccountId();
-      //TODO: check here that the public and private keys match. Broken data integrity would mean
-      //TODO: the user would have no access to his or her funds if they don't match.
+    final String publicKey = accountBridge.getStellarAccountId();
+    //TODO: check here that the public and private keys match. Broken data integrity would mean
+    //TODO: the user would have no access to his or her funds if they don't match.
 
 
-      if (!userAccountId.isPresent()) {
-        return StellarAccountId.mainAccount(publicKey);
-      } else {
-        //TODO: check that an account under this account id actually exists.
-        return StellarAccountId.subAccount(publicKey, userAccountId.get());
-      }
+    if (!userAccountId.isPresent()) {
+      return StellarAccountId.mainAccount(publicKey);
+    } else {
+      //TODO: check that an account under this account id actually exists.
+      return StellarAccountId.subAccount(publicKey, userAccountId.get());
     }
   }
 }

@@ -24,6 +24,7 @@ import org.mifos.module.stellar.restdomain.AccountBridgeConfiguration;
 import org.mifos.module.stellar.restdomain.JournalEntryData;
 import org.mifos.module.stellar.restdomain.TrustLineConfiguration;
 import org.mifos.module.stellar.service.*;
+import org.mifos.module.stellar.service.SecurityException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,7 +62,7 @@ public class StellarBridgeController {
       @RequestHeader("X-Mifos-Entity") final String entity,
       @RequestHeader("X-Mifos-Action") final String action,
       @RequestBody final String payload)
-      throws InvalidApiKeyException {
+      throws SecurityException {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     if (entity.equalsIgnoreCase("JOURNALENTRY")
@@ -76,7 +77,7 @@ public class StellarBridgeController {
     }
 
 
-    return new ResponseEntity<>(HttpStatus.OK);
+    return new ResponseEntity<>(HttpStatus.CREATED);
   }
 
   @RequestMapping(value = "/stellar/creditline", method = RequestMethod.POST,
@@ -91,9 +92,28 @@ public class StellarBridgeController {
 
     this.stellarBridgeService.createCreditLine(
         mifosTenantId,
-        StellarAddress.parse(stellarTrustLineConfig.getTrustedAccount()),
-        stellarTrustLineConfig.getTrustedCurrency(),
+        StellarAddress.parse(stellarTrustLineConfig.getTrustedStellarAddress()),
+        stellarTrustLineConfig.getTrustedAssetCode(),
         stellarTrustLineConfig.getMaximumAmount());
+
+    return new ResponseEntity<>(HttpStatus.CREATED);
+  }
+
+  @RequestMapping(value = "/stellar/creditline/{stellarAddress}/{assetCode}"
+      , method = RequestMethod.DELETE, produces = {"application/json"})
+  public ResponseEntity<Void> deleteCreditLine(
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @PathVariable("stellarAddress") final String stellarAddress,
+      @PathVariable("assetCode") final String assetCode)
+      throws InvalidStellarAddressException
+  {
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
+
+    this.stellarBridgeService.deleteCreditLine(
+        mifosTenantId,
+        StellarAddress.parse(stellarAddress),
+        assetCode);
 
     return new ResponseEntity<>(HttpStatus.OK);
   }
@@ -104,18 +124,8 @@ public class StellarBridgeController {
       @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
   {
     final String mifosTenantId = stellarBridgeConfig.getMifosTenantId();
-    if (this.stellarBridgeService.accountBridgeExistsForTenantId(mifosTenantId))
-    {
-      // HttpStatus.BAD_REQUEST is more widely recognized.  CONFLICT more semantically correct.
-      // This line may require adjustment.
-      // HttpStatus.SEE_OTHER would also be a valid response.
-      return new ResponseEntity<>("Tenant " + mifosTenantId + " already exists!",
-          HttpStatus.CONFLICT);
-    }
-
-    final String newApiKey = this.securityService.generateApiKey();
+    final String newApiKey = this.securityService.generateApiKey(mifosTenantId);
     stellarBridgeService.createStellarBridgeConfig(
-        newApiKey,
         stellarBridgeConfig.getMifosTenantId(),
         stellarBridgeConfig.getMifosToken());
 
@@ -123,12 +133,13 @@ public class StellarBridgeController {
   }
 
   @RequestMapping(value = "/stellar/configuration/{mifosTenantId}", method = RequestMethod.DELETE,
-                   consumes = {"application/json"}, produces = {"application/json"})
+      produces = {"application/json"})
   public ResponseEntity<Void> deleteAccountBridgeConfiguration(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @PathVariable("mifosTenantId") final String mifosTenantId)
   {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
+    this.securityService.removeApiKey(mifosTenantId);
 
     if (stellarBridgeService.deleteAccountBridgeConfig(mifosTenantId))
     {
@@ -161,52 +172,53 @@ public class StellarBridgeController {
       @PathVariable("assetCode") final String assetCode)
   {
     return new ResponseEntity<>(
-        stellarBridgeService.getInstallationAccountBalance(accountSecretSeed, assetCode).toString(),
+        stellarBridgeService.getStellarAccountBalance(accountSecretSeed, assetCode).toString(),
         HttpStatus.OK);
+    //TODO: delete this.
 
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
-  public void handleInvalidApiKeyException(
-      @SuppressWarnings("unused") final InvalidApiKeyException ex) {
-    //TODO: add message to error
+  public String handleInvalidApiKeyException(
+      @SuppressWarnings("unused") final SecurityException ex) {
+    return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public void handleInvalidConfigurationException(
+  public String handleInvalidConfigurationException(
       @SuppressWarnings("unused") final InvalidConfigurationException ex) {
-    //TODO: add message to error
+    return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public void handleStellarAccountCreationFailedException(
+  public String handleStellarAccountCreationFailedException(
       @SuppressWarnings("unused") final StellarAccountCreationFailedException ex) {
-    //TODO: add message to error
+    return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public void handleInvalidStellarAddressException(
+  public String handleInvalidStellarAddressException(
       @SuppressWarnings("unused") final InvalidStellarAddressException ex) {
-    //TODO: add message to error
+    return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public void handleFederationFailedException(
+  public String handleFederationFailedException(
       @SuppressWarnings("unused") final FederationFailedException ex) {
-    //TODO: add message to error.
+    return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public void handleStellarTrustLineCreationFailedException(
+  public String handleStellarTrustLineCreationFailedException(
       @SuppressWarnings("unused") final StellarCreditLineCreationFailedException ex)
   {
+    return ex.getMessage();
     //TODO: figure out how to communicate missing funds problem to user.
-    //TODO: add message to error.
   }
 }

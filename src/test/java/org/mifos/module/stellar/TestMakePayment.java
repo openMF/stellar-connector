@@ -15,23 +15,19 @@
  */
 package org.mifos.module.stellar;
 
-
 import com.jayway.restassured.RestAssured;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.mifos.module.stellar.configuration.MifosStellarBridgeConfiguration;
-import org.mifos.module.stellar.restdomain.TrustLineConfiguration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import static com.jayway.restassured.RestAssured.*;
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -43,8 +39,10 @@ import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
     "stellar.new-account-initial-balance=1020",
     "stellar.local-federation-domain=" + TEST_ADDRESS_DOMAIN
 })
-public class TestCreateCreditLine {
+public class TestMakePayment {
 
+  public static final String ASSET_CODE = "XXX";
+  public static final BigDecimal CREDIT_LIMIT = BigDecimal.valueOf(1000);
   @Value("${local.server.port}")
   int bridgePort;
 
@@ -76,6 +74,10 @@ public class TestCreateCreditLine {
     secondTenantId = UUID.randomUUID().toString();
     secondTenantApiKey = createBridge(secondTenantId);
     testCleanup.addStep(() -> deleteBridge(secondTenantId, secondTenantApiKey));
+
+    createCreditLine(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, CREDIT_LIMIT);
+    testCleanup.addStep(
+        () -> deleteCreditLine(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE));
   }
 
   @After
@@ -89,24 +91,37 @@ public class TestCreateCreditLine {
   }
 
   @Test
-  public void createCreditLineIncorrectApiKey() {
-    final TrustLineConfiguration trustLine =
-        new TrustLineConfiguration(secondTenantId, "XXX", BigDecimal.valueOf(100));
+  public void paymentHappyCase() throws InterruptedException {
+    final BigDecimal transferAmount = BigDecimal.valueOf(10);
 
-    given().header(CONTENT_TYPE_HEADER)
-        .header(API_KEY_HEADER_LABEL, secondTenantApiKey) //Key doesnt' match tenant.
-        .header(TENANT_ID_HEADER_LABEL, firstTenantId)
-        .body(trustLine)
-        .post("/modules/stellar/creditline")
-        .then().assertThat().statusCode(HttpStatus.UNAUTHORIZED.value());
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,transferAmount);
+
+    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
+
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, transferAmount);
   }
 
   @Test
-  public void createCreditLineHappyCase() {
-    final String assetCode = "XXX";
+  public void paymentAboveCreditLimit() throws InterruptedException
+  {
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,
+        CREDIT_LIMIT.add(BigDecimal.ONE));
 
-    createCreditLine(firstTenantId, firstTenantApiKey, secondTenantId, assetCode, BigDecimal.valueOf(1000));
+    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
 
-    deleteCreditLine(firstTenantId, firstTenantApiKey, secondTenantId, assetCode);
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
   }
+
+  /*@Test
+  public void cancellingPayments() throws InterruptedException
+  {
+    final BigDecimal transferAmount = BigDecimal.valueOf(10);
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE, transferAmount);
+    makePayment(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, transferAmount);
+
+    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
+
+    checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+  }*/
 }

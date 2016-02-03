@@ -19,11 +19,10 @@ import org.mifos.module.stellar.federation.FederationFailedException;
 import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.federation.StellarAddress;
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
-import org.mifos.module.stellar.repository.AccountBridgeRepository;
 import org.mifos.module.stellar.service.HorizonServerUtilities;
 import org.mifos.module.stellar.service.StellarAddressResolver;
+import org.mifos.module.stellar.repository.AccountBridgeEncodedRepository;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -33,18 +32,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
 
-  private final AccountBridgeRepository accountBridgeRepository;
+  private final AccountBridgeEncodedRepository accountBridgeEncodedRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
   private final Logger logger;
 
   @Autowired
   public PaymentEventListener(
-      final AccountBridgeRepository accountBridgeRepository,
+      final AccountBridgeEncodedRepository accountBridgeEncodedRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
-    this.accountBridgeRepository = accountBridgeRepository;
+    this.accountBridgeEncodedRepository = accountBridgeEncodedRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
     this.logger = logger;
@@ -56,7 +55,8 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
     final PaymentPersistency paymentPayload = event.getPayload();
     final StellarAccountId targetAccountId;
     try {
-      targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(StellarAddress.parse(paymentPayload.targetAccount));
+      targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(
+          StellarAddress.forTenant(paymentPayload.targetAccount, paymentPayload.sinkDomain));
     }
     catch (final InvalidStellarAddressException | FederationFailedException ex)
     {
@@ -65,17 +65,16 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
       //TODO: decide what to do with the event.  Retry? In which cases?
     }
 
-    try (final AccountBridgePersistency accountBridge =
-        accountBridgeRepository.findByMifosTenantId(paymentPayload.sourceTenantId))
-    {
-      horizonServerUtilities.pay(
-          targetAccountId,
-          paymentPayload.amount,
-          paymentPayload.assetCode,
-          accountBridge.getStellarAccountPrivateKey());
+    final char[] decodedStellarPrivateKey =
+        accountBridgeEncodedRepository.getPrivateKey(paymentPayload.sourceTenantId);
 
-      //TODO: adjust mifos balance
-      //TODO: Mark event as processed
-    }
+    horizonServerUtilities.pay(
+        targetAccountId,
+        paymentPayload.amount,
+        paymentPayload.assetCode,
+        decodedStellarPrivateKey);
+
+    //TODO: adjust mifos balance
+    //TODO: Mark event as processed
   }
 }

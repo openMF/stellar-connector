@@ -27,6 +27,11 @@ public class StellarAddress {
   private final String tenantName;
   private final Optional<String> userAccountId;
 
+  public static StellarAddress forTenant(final String tenantName, final String domain)
+  {
+    return new StellarAddress(InternetDomainName.from(domain), tenantName, Optional.empty());
+  }
+
   public static StellarAddress parse(final String address)
       throws InvalidStellarAddressException
   {

@@ -27,6 +27,6 @@ public class StellarCreditLineCreationFailedException extends RuntimeException {
   }
 
   public static StellarCreditLineCreationFailedException trustLineTransactionFailed() {
-    return new StellarCreditLineCreationFailedException("Trustline creation failed.");
+    return new StellarCreditLineCreationFailedException("Credit line creation failed.");
   }
 }

@@ -17,10 +17,9 @@ package org.mifos.module.stellar.service;
 import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.*;
 import org.mifos.module.stellar.listener.MifosPaymentEvent;
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
-import org.mifos.module.stellar.repository.AccountBridgeRepository;
+import org.mifos.module.stellar.repository.AccountBridgeEncodedRepository;
 import org.mifos.module.stellar.repository.MifosEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,21 +33,21 @@ import java.util.Date;
 @Service
 public class StellarBridgeService implements ApplicationEventPublisherAware {
   private final StellarAddressResolver stellarAddressResolver;
+  private final AccountBridgeEncodedRepository accountBridgeEncodedRepository;
   private ApplicationEventPublisher eventPublisher;
   private final MifosEventRepository mifosEventRepository;
-  private final AccountBridgeRepository accountBridgeRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final Gson gson;
 
   @Autowired
   public StellarBridgeService(
       final MifosEventRepository mifosEventRepository,
-      final AccountBridgeRepository accountBridgeRepository,
+      final AccountBridgeEncodedRepository accountBridgeEncodedRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final Gson gson,
       final StellarAddressResolver stellarAddressResolver) {
     this.mifosEventRepository = mifosEventRepository;
-    this.accountBridgeRepository = accountBridgeRepository;
+    this.accountBridgeEncodedRepository = accountBridgeEncodedRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.gson = gson;
     this.stellarAddressResolver = stellarAddressResolver;
@@ -63,7 +62,6 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
    * Create a bridge between a Mifos account and a stellar account.  This creates the Stellar
    * account and saves the association.
    *
-   * @param restApiKey for secure access
    * @param mifosTenantId the id of the tenant we are setting this up for.
    * @param mifosToken a token to access mifos with.
    *
@@ -71,24 +69,14 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
    * @throws StellarAccountCreationFailedException
    */
   public void createStellarBridgeConfig(
-      final String restApiKey,
       final String mifosTenantId,
       final String mifosToken)
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final KeyPair accountKeyPair = horizonServerUtilities.createAccount();
 
-    try (final AccountBridgePersistency accountBridge =
-        new AccountBridgePersistency(
-            restApiKey,
-            mifosTenantId,
-            mifosToken,
-            accountKeyPair.getAccountId(),
-            accountKeyPair.getSecretSeed()))
-    {
-
-      this.accountBridgeRepository.save(accountBridge);
-    }
+    this.accountBridgeEncodedRepository.save(
+        mifosTenantId, mifosToken, accountKeyPair.getAccountId(), accountKeyPair.getSecretSeed());
   }
 
   /**
@@ -105,51 +93,51 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
       final String mifosTenantId,
       final StellarAddress stellarAddressToTrust,
       final String currency,
-      final long maximumAmount)
+      final BigDecimal maximumAmount)
       throws InvalidStellarAddressException,
       FederationFailedException, StellarCreditLineCreationFailedException,
       InvalidConfigurationException
   {
-    try (final AccountBridgePersistency accountBridge =
-        this.accountBridgeRepository.findByMifosTenantId(mifosTenantId)) {
 
-      final StellarAccountId accountIdOfStellarAccountToTrust =
-          stellarAddressResolver.getAccountIdOfStellarAccount(stellarAddressToTrust);
+    final StellarAccountId accountIdOfStellarAccountToTrust =
+        getTopLevelStellarAccountId(stellarAddressToTrust);
 
-      if (accountIdOfStellarAccountToTrust.getSubAccount().isPresent()) {
-        throw StellarCreditLineCreationFailedException.needTopLevelStellarAccount(stellarAddressToTrust.toString());
-      }
+    final char[] decodedPrivateKey = accountBridgeEncodedRepository.getPrivateKey(mifosTenantId);
 
-      horizonServerUtilities.createCreditLine(accountBridge.getStellarAccountPrivateKey(),
-          accountIdOfStellarAccountToTrust.getPublicKey(), currency, maximumAmount);
-
-    }
+    horizonServerUtilities.setCreditLineSize(decodedPrivateKey,
+        accountIdOfStellarAccountToTrust.getPublicKey(), currency, maximumAmount);
   }
 
-  public boolean accountBridgeExistsForTenantId(final String mifosTenantId) {
+  public void deleteCreditLine(
+      final String mifosTenantId,
+      final StellarAddress stellarAddress,
+      final String assetCode) {
 
-    try (final AccountBridgePersistency accountBridge =
-        this.accountBridgeRepository.findByMifosTenantId(mifosTenantId))
-    {
-      return accountBridge != null;
+    final StellarAccountId accountIdOfStellarAccountToTrust =
+        getTopLevelStellarAccountId(stellarAddress);
+
+    final char[] decodedPrivateKey = accountBridgeEncodedRepository.getPrivateKey(mifosTenantId);
+
+    horizonServerUtilities.minimizeCreditLine(decodedPrivateKey,
+        accountIdOfStellarAccountToTrust.getPublicKey(), assetCode);
+  }
+
+  private StellarAccountId getTopLevelStellarAccountId(StellarAddress stellarAddressToTrust) {
+    final StellarAccountId accountIdOfStellarAccountToTrust =
+        stellarAddressResolver.getAccountIdOfStellarAccount(stellarAddressToTrust);
+
+    if (accountIdOfStellarAccountToTrust.getSubAccount().isPresent()) {
+      throw StellarCreditLineCreationFailedException
+          .needTopLevelStellarAccount(stellarAddressToTrust.toString());
     }
+    return accountIdOfStellarAccountToTrust;
   }
 
   public boolean deleteAccountBridgeConfig(final String mifosTenantId)
   {
-    try (final AccountBridgePersistency bridge =
-        this.accountBridgeRepository.findByMifosTenantId(mifosTenantId))
-    {
+    return this.accountBridgeEncodedRepository.delete(mifosTenantId);
 
-      //TODO: figure out what to do with the associated Stellar account before you delete its private key.
-
-      if (bridge == null) {
-        return false;
-      }
-
-      this.accountBridgeRepository.delete(bridge.getId());
-      return true;
-    }
+    //TODO: figure out what to do with the associated Stellar account before you delete its private key.
   }
 
   public void sendPaymentToStellar(
@@ -177,17 +165,16 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
 
   public BigDecimal getBalance(final String mifosTenantId, final String assetCode)
   {
-    try (final AccountBridgePersistency accountBridge =
-        this.accountBridgeRepository.findByMifosTenantId(mifosTenantId))
-    {
-      return this.horizonServerUtilities
-          .getBalance(accountBridge.getStellarAccountPrivateKey(), assetCode);
-    }
+    final char[] decodedPrivateKey = accountBridgeEncodedRepository.getPrivateKey(mifosTenantId);
+    //TODO:
+    return this.horizonServerUtilities
+        .getBalance(decodedPrivateKey, assetCode);
   }
 
-  public BigDecimal getInstallationAccountBalance(
+  public BigDecimal getStellarAccountBalance(
       final String accountSecretSeed,
       final String assetCode) {
+    //TODO: remove this.
     return horizonServerUtilities.getBalance(accountSecretSeed.toCharArray(), assetCode);
   }
 }

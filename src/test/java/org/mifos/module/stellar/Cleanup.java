@@ -13,10 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar;
 
-public class InvalidApiKeyException extends RuntimeException {
-  public InvalidApiKeyException(final String apiKey) {
-    super("The api key " + apiKey + " is invalid.");
+import java.util.LinkedList;
+import java.util.List;
+
+public class Cleanup {
+  public interface Step {
+    void clean() throws Exception;
+  }
+
+  private List<Step> steps = new LinkedList<>();
+
+  public Cleanup() { super(); }
+
+  public void addStep (final Step newFirstStep) { steps.add(0, newFirstStep); }
+
+  public void cleanup() throws Exception
+  {
+    for (final Step step : steps)
+    {
+      step.clean();
+    }
   }
 }

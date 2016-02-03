@@ -16,17 +16,13 @@
 package org.mifos.module.stellar.persistencedomain;
 
 import javax.persistence.*;
-import java.util.Arrays;
 
 @Entity
 @Table(name = "stellar_account_bridge")
-public class AccountBridgePersistency implements AutoCloseable {
+public class AccountBridgePersistency {
   @Id
   @GeneratedValue
   private Long id;
-
-  @Column(name = "rest_api_key")
-  private String restApiKey;
 
   @Column(name = "mifos_tenant_id")
   private String mifosTenantId;
@@ -44,13 +40,10 @@ public class AccountBridgePersistency implements AutoCloseable {
   public AccountBridgePersistency() {}
 
   public AccountBridgePersistency(
-      final String restApiKey,
       final String mifosTenantId,
       final String mifosToken,
       final String stellarAccountId,
       final char[] stellarAccountPrivateKey) {
-
-    this.restApiKey = restApiKey;
     this.mifosTenantId = mifosTenantId;
     this.mifosToken = mifosToken;
     this.stellarAccountId = stellarAccountId;
@@ -59,10 +52,6 @@ public class AccountBridgePersistency implements AutoCloseable {
 
   public Long getId() {
     return id;
-  }
-
-  public String getRestApiKey() {
-    return restApiKey;
   }
 
   public String getMifosTenantId() {
@@ -79,10 +68,5 @@ public class AccountBridgePersistency implements AutoCloseable {
 
   public char[] getStellarAccountPrivateKey() {
     return stellarAccountPrivateKey;
-  }
-
-  @Override public void close() {
-    //Clear sensitive data.
-    Arrays.fill(stellarAccountPrivateKey, (char)0);
   }
 }

@@ -15,28 +15,37 @@
  */
 package org.mifos.module.stellar.restdomain;
 
+import java.math.BigDecimal;
+
 public class TrustLineConfiguration {
 
-  @SuppressWarnings("unused")
-  private String trustedAccount;
+  private String trustedStellarAddress;
 
-  @SuppressWarnings("unused")
-  private String trustedCurrency;
+  private String trustedAssetCode;
 
-  @SuppressWarnings("unused")
-  private long maximumAmount;
+  private BigDecimal maximumAmount;
 
-  TrustLineConfiguration() { super(); }
+  @SuppressWarnings("unused") //needed for Json Mapping.
+  TrustLineConfiguration() {super();}
 
-  public String getTrustedAccount() {
-    return trustedAccount;
+  public TrustLineConfiguration(
+      final String trustedStellarAddress,
+      final String trustedAssetCode,
+      final BigDecimal maximumAmount) {
+    this.trustedStellarAddress = trustedStellarAddress;
+    this.trustedAssetCode = trustedAssetCode;
+    this.maximumAmount = maximumAmount;
   }
 
-  public String getTrustedCurrency() {
-    return trustedCurrency;
+  public String getTrustedStellarAddress() {
+    return trustedStellarAddress;
   }
 
-  public long getMaximumAmount() {
+  public String getTrustedAssetCode() {
+    return trustedAssetCode;
+  }
+
+  public BigDecimal getMaximumAmount() {
     return maximumAmount;
   }
 }

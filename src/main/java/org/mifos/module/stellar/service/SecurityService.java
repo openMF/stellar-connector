@@ -15,8 +15,8 @@
  */
 package org.mifos.module.stellar.service;
 
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.mifos.module.stellar.repository.AccountBridgeRepository;
+import org.mifos.module.stellar.persistencedomain.AccountBridgeKeyPersistency;
+import org.mifos.module.stellar.repository.AccountBridgeKeyRepository;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,34 +28,51 @@ import java.util.UUID;
 
 @Service
 public class SecurityService {
-  private final AccountBridgeRepository accountBridgeRepository;
+  private final AccountBridgeKeyRepository accountBridgeKeyRepository;
   private final Logger logger;
 
   @Autowired
   SecurityService(@Qualifier("stellarBridgeLogger") final Logger logger,
-      final AccountBridgeRepository accountBridgeRepository)
+      final AccountBridgeKeyRepository accountBridgeRepository)
   {
     this.logger = logger;
-    this.accountBridgeRepository = accountBridgeRepository;
+    this.accountBridgeKeyRepository = accountBridgeRepository;
   }
 
   public void verifyApiKey(final String apiKey, final String mifosTenantId)
-      throws InvalidApiKeyException
+      throws SecurityException
   {
-    try (final AccountBridgePersistency accountBridge =
-        accountBridgeRepository.findByMifosTenantId(mifosTenantId))
+    final AccountBridgeKeyPersistency accountBridge =
+        accountBridgeKeyRepository.findByMifosTenantId(mifosTenantId);
+    if (accountBridge == null)
     {
-      if (!accountBridge.getRestApiKey().equals(apiKey)) {
-        throw new InvalidApiKeyException(apiKey);
-      }
+      throw SecurityException.invalidTenantId(mifosTenantId);
+    }
+    if (!accountBridge.getRestApiKey().equals(apiKey)) {
+      throw SecurityException.invalidApiKey(apiKey);
     }
   }
 
-  public String generateApiKey() {
+  public String generateApiKey(final String mifosTenantId) {
+
+    //Check that there isn't already one.
+    final AccountBridgeKeyPersistency accountBridge =
+        accountBridgeKeyRepository.findByMifosTenantId(mifosTenantId);
+
+    if (accountBridge != null)
+    {
+      throw SecurityException.apiKeyAlreadyExistsForTenant(mifosTenantId);
+    }
+
     final String randomKey = UUID.randomUUID().toString();
     try
     {
-      return URLEncoder.encode(randomKey, "UTF-8");
+      final String restApiKey = URLEncoder.encode(randomKey, "UTF-8");
+      accountBridgeKeyRepository.save(new AccountBridgeKeyPersistency(
+          restApiKey,
+          mifosTenantId));
+
+      return restApiKey;
     }
     catch (final UnsupportedEncodingException e)
     {
@@ -63,5 +80,10 @@ public class SecurityService {
       logger.error("Could not create API key, reason,", e);
       throw new UnexpectedException();
     }
+  }
+
+  @SuppressWarnings("unused")
+  public void removeApiKey(final String mifosTenantId) {
+    //TODO:
   }
 }
