@@ -26,6 +26,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.UUID;
 
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
@@ -52,6 +53,8 @@ public class TestMakePayment {
   private String firstTenantApiKey;
   private String secondTenantId;
   private String secondTenantApiKey;
+  private String thirdTenantId;
+  private String thirdTenantApiKey;
 
   @BeforeClass
   public static void setupSystem() throws IOException, InterruptedException {
@@ -75,6 +78,10 @@ public class TestMakePayment {
     secondTenantApiKey = createBridge(secondTenantId);
     testCleanup.addStep(() -> deleteBridge(secondTenantId, secondTenantApiKey));
 
+    thirdTenantId = UUID.randomUUID().toString();
+    thirdTenantApiKey = createBridge(thirdTenantId);
+    testCleanup.addStep(() -> deleteBridge(thirdTenantId, thirdTenantApiKey));
+
     createCreditLine(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, CREDIT_LIMIT);
     testCleanup.addStep(
         () -> deleteCreditLine(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE));
@@ -92,11 +99,11 @@ public class TestMakePayment {
 
   @Test
   public void paymentHappyCase() throws InterruptedException {
-    final BigDecimal transferAmount = BigDecimal.valueOf(10);
+    final BigDecimal transferAmount = BigDecimal.TEN;
 
     makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,transferAmount);
 
-    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
+    waitForPaymentToComplete();
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, transferAmount);
   }
@@ -107,21 +114,93 @@ public class TestMakePayment {
     makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,
         CREDIT_LIMIT.add(BigDecimal.ONE));
 
-    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
+    waitForPaymentToComplete();
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
   }
 
-  /*@Test
+  @Test
   public void cancellingPayments() throws InterruptedException
   {
-    final BigDecimal transferAmount = BigDecimal.valueOf(10);
+    final BigDecimal transferAmount = BigDecimal.TEN;
     makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE, transferAmount);
     makePayment(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, transferAmount);
 
-    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
+    waitForPaymentToComplete();
 
     checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
-  }*/
+  }
+
+  @Test
+  public void overlappingPayments() throws InterruptedException {
+    final BigDecimal transferAmount = BigDecimal.TEN;
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE, transferAmount);
+    makePayment(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, transferAmount.add(transferAmount));
+
+    waitForPaymentToComplete();
+
+    checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, transferAmount);
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+  }
+
+  @Test
+  public void roundRobinPayments() throws InterruptedException {
+    final BigDecimal transferAmount = BigDecimal.TEN;
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE, transferAmount);
+    makePayment(secondTenantId, secondTenantApiKey, thirdTenantId, ASSET_CODE, transferAmount);
+    makePayment(thirdTenantId, thirdTenantApiKey, firstTenantId, ASSET_CODE, transferAmount);
+
+    waitForPaymentToComplete();
+
+    checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+    checkBalance(thirdTenantId, thirdTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+  }
+
+
+  @Test
+  public void paymentSumApproachesCreditLimit() throws InterruptedException {
+    //Approach the credit limit, then go back down to zero.
+    Collections.nCopies(10, BigDecimal.valueOf(99.99))
+        .parallelStream()
+        .forEach((transferAmount) ->
+            makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,
+                transferAmount));
+
+    Collections.nCopies(10, BigDecimal.valueOf(99.99))
+        .parallelStream()
+        .forEach((transferAmount) ->
+            makePayment(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE,
+                transferAmount));
+
+    waitForPaymentToComplete();
+    checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+
+
+    //Approach the credit limit again, then go to exactly the credit limit
+    Collections.nCopies(10, BigDecimal.valueOf(99.99))
+        .parallelStream()
+        .forEach((transferAmount) ->
+            makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,
+                transferAmount));
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,
+        BigDecimal.valueOf(0.1));
+
+    waitForPaymentToComplete();
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, CREDIT_LIMIT);
+
+
+    //Now try to go over the credit limit.
+    makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE,
+        BigDecimal.valueOf(0.1));
+
+    waitForPaymentToComplete();
+    checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, CREDIT_LIMIT);
+  }
+
+  public void waitForPaymentToComplete() throws InterruptedException {
+    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
+  }
 }
