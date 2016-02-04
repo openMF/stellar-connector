@@ -166,15 +166,12 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
   public BigDecimal getBalance(final String mifosTenantId, final String assetCode)
   {
     final char[] decodedPrivateKey = accountBridgeEncodedRepository.getPrivateKey(mifosTenantId);
-    //TODO:
     return this.horizonServerUtilities
         .getBalance(decodedPrivateKey, assetCode);
   }
 
-  public BigDecimal getStellarAccountBalance(
-      final String accountSecretSeed,
+  public BigDecimal getInstallationAccountBalance(
       final String assetCode) {
-    //TODO: remove this.
-    return horizonServerUtilities.getBalance(accountSecretSeed.toCharArray(), assetCode);
+    return horizonServerUtilities.getInstallationAccountBalance(assetCode);
   }
 }

@@ -46,6 +46,9 @@ public class HorizonServerUtilities {
   @Value("${stellar.new-account-initial-balance}")
   private int initialBalance = 20;
 
+  @Value("${stellar.local-federation-domain}")
+  private String localFederationDomain;
+
   @Autowired
   HorizonServerUtilities(@Qualifier("stellarBridgeLogger")final Logger logger)
   {
@@ -76,7 +79,7 @@ public class HorizonServerUtilities {
     createAccountForKeyPair(newTenantStellarAccountKeyPair, server, installationAccountKeyPair,
         installationAccount);
 
-    //TODO: setup inflation voting for the new account.
+    setOptionsForNewAccount(newTenantStellarAccountKeyPair, server, installationAccountKeyPair);
 
     return newTenantStellarAccountKeyPair;
   }
@@ -260,6 +263,11 @@ public class HorizonServerUtilities {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
+
+  public BigDecimal getInstallationAccountBalance(final String assetCode) {
+    return this.getBalance(installationAccountPrivateKey.toCharArray(), assetCode);
+  }
+
   private void createAccountForKeyPair(
       final KeyPair newAccountKeyPair,
       final Server server,
@@ -278,7 +286,8 @@ public class HorizonServerUtilities {
     final CreateAccountOperation createAccountOperation =
         new CreateAccountOperation.Builder(newAccountKeyPair,
             Integer.toString(initialBalance)).
-            setSourceAccount(installationAccountKeyPair).build();
+            setSourceAccount(installationAccountKeyPair)
+            .build();
 
     transactionBuilder.addOperation(createAccountOperation);
 
@@ -287,6 +296,33 @@ public class HorizonServerUtilities {
     createAccountTransaction.sign(installationAccountKeyPair);
 
     submitTransaction(server, createAccountTransaction, StellarAccountCreationFailedException::new);
+  }
+
+  private void setOptionsForNewAccount(
+      final KeyPair newAccountKeyPair,
+      final Server server,
+      final KeyPair installationAccountKeyPair)
+      throws StellarAccountCreationFailedException, InvalidConfigurationException
+  {
+    final Account newAccount = getAccount(server, newAccountKeyPair);
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
+
+    final SetOptionsOperation.Builder setOptionsOperationBuilder =
+        new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair);
+
+    if (localFederationDomain != null)
+    {
+      setOptionsOperationBuilder.setHomeDomain(localFederationDomain);
+    }
+
+    setOptionsOperationBuilder.setInflationDestination(installationAccountKeyPair);
+
+    transactionBuilder.addOperation(setOptionsOperationBuilder.build());
+
+    final Transaction setOptionsTransaction = transactionBuilder.build();
+
+    setOptionsTransaction.sign(newAccountKeyPair);
+    submitTransaction(server, setOptionsTransaction, StellarAccountCreationFailedException::new);
   }
 
   private Account getAccount(final Server server, final KeyPair installationAccountKeyPair)

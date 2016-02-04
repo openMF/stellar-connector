@@ -165,16 +165,14 @@ public class StellarBridgeController {
         HttpStatus.OK);
   }
 
-  @RequestMapping(value = "/stellar/account/{secretSeed}/balance/{assetCode}",
+  @RequestMapping(value = "/stellar/installationaccount/balance/{assetCode}",
       method = RequestMethod.GET, consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<String> getInstallationAccountBalance(
-      @PathVariable("secretSeed") final String accountSecretSeed,
       @PathVariable("assetCode") final String assetCode)
   {
     return new ResponseEntity<>(
-        stellarBridgeService.getStellarAccountBalance(accountSecretSeed, assetCode).toString(),
+        stellarBridgeService.getInstallationAccountBalance(assetCode).toString(),
         HttpStatus.OK);
-    //TODO: delete this.
 
   }
 
@@ -215,7 +213,7 @@ public class StellarBridgeController {
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public String handleStellarTrustLineCreationFailedException(
+  public String handleStellarCreditLineCreationFailedException(
       @SuppressWarnings("unused") final StellarCreditLineCreationFailedException ex)
   {
     return ex.getMessage();
