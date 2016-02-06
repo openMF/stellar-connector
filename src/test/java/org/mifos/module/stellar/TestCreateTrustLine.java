@@ -28,7 +28,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
 import java.util.UUID;
 
 import static com.jayway.restassured.RestAssured.*;
@@ -43,7 +45,8 @@ import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
     "stellar.new-account-initial-balance=1020",
     "stellar.local-federation-domain=" + TEST_ADDRESS_DOMAIN
 })
-public class TestCreateCreditLine {
+public class TestCreateTrustLine {
+  public static final String ASSET_CODE = "XXX";
 
   @Value("${local.server.port}")
   int bridgePort;
@@ -68,6 +71,7 @@ public class TestCreateCreditLine {
   @Before
   public void setupTest() {
     RestAssured.port = bridgePort;
+    RestAssured.enableLoggingOfRequestAndResponseIfValidationFails();
 
     firstTenantId = UUID.randomUUID().toString();
     firstTenantApiKey = createBridge(firstTenantId);
@@ -75,6 +79,7 @@ public class TestCreateCreditLine {
 
     secondTenantId = UUID.randomUUID().toString();
     secondTenantApiKey = createBridge(secondTenantId);
+    createVault(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.TEN);
     testCleanup.addStep(() -> deleteBridge(secondTenantId, secondTenantApiKey));
   }
 
@@ -89,24 +94,57 @@ public class TestCreateCreditLine {
   }
 
   @Test
-  public void createCreditLineIncorrectApiKey() {
+  public void createTrustLineIncorrectApiKey() {
     final TrustLineConfiguration trustLine =
-        new TrustLineConfiguration(secondTenantId, "XXX", BigDecimal.valueOf(100));
+        new TrustLineConfiguration(BigDecimal.valueOf(100));
+
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode(tenantVaultStellarAddress(secondTenantId), "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
 
     given().header(CONTENT_TYPE_HEADER)
-        .header(API_KEY_HEADER_LABEL, secondTenantApiKey) //Key doesnt' match tenant.
+        .header(API_KEY_HEADER_LABEL, secondTenantApiKey) //Key doesn't match tenant.
         .header(TENANT_ID_HEADER_LABEL, firstTenantId)
+        .pathParameter("assetCode", ASSET_CODE)
+        .pathParameter("issuer", issuer)
         .body(trustLine)
-        .post("/modules/stellar/creditline")
+        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.UNAUTHORIZED.value());
   }
 
   @Test
-  public void createCreditLineHappyCase() {
-    final String assetCode = "XXX";
+  public void createTrustLineTrusteeDoesntExist() {
+    final TrustLineConfiguration trustLine = new TrustLineConfiguration(BigDecimal.TEN);
 
-    createCreditLine(firstTenantId, firstTenantApiKey, secondTenantId, assetCode, BigDecimal.valueOf(1000));
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode("blah*test.org", "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
 
-    deleteCreditLine(firstTenantId, firstTenantApiKey, secondTenantId, assetCode);
+    given().header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, firstTenantApiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, firstTenantId)
+        .pathParameter("assetCode", ASSET_CODE)
+        .pathParameter("issuer", issuer)
+        .body(trustLine)
+        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
+  }
+
+  @Test
+  public void createTrustLineHappyCase() {
+
+    final String secondTenantStellarAddress = tenantVaultStellarAddress(secondTenantId);
+
+    createTrustLine(firstTenantId, firstTenantApiKey,
+        secondTenantStellarAddress, ASSET_CODE,
+        BigDecimal.valueOf(1000));
+
+    deleteTrustLine(firstTenantId, firstTenantApiKey, secondTenantStellarAddress, ASSET_CODE);
   }
 }

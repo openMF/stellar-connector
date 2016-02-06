@@ -21,6 +21,7 @@ import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAddress;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.restdomain.AccountBridgeConfiguration;
+import org.mifos.module.stellar.restdomain.AmountConfiguration;
 import org.mifos.module.stellar.restdomain.JournalEntryData;
 import org.mifos.module.stellar.restdomain.TrustLineConfiguration;
 import org.mifos.module.stellar.service.*;
@@ -30,7 +31,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
+import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
+import java.net.URLDecoder;
+
+@RestController()
 @RequestMapping("/modules")
 public class StellarBridgeController {
   private static final String API_KEY_HEADER_LABEL = "X-Stellar-Bridge-API-Key";
@@ -54,7 +59,7 @@ public class StellarBridgeController {
     this.gson = gson;
   }
 
-  @RequestMapping(value = "/stellar/payments", method = RequestMethod.POST,
+  @RequestMapping(value = "/stellar/bridge/payments/", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<Void> sendStellarPayment(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
@@ -80,45 +85,38 @@ public class StellarBridgeController {
     return new ResponseEntity<>(HttpStatus.CREATED);
   }
 
-  @RequestMapping(value = "/stellar/creditline", method = RequestMethod.POST,
-                  consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<Void> createCreditLine(
+  @RequestMapping(
+      value = "/stellar/bridge/trustlines/{assetCode}/{issuer}/",
+      method = RequestMethod.PUT,
+      consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<Void> adjustTrustLine(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @PathVariable("assetCode") final String trustedAssetCode,
+      @PathVariable("issuer") final String urlEncodedIssuingStellarAddress,
       @RequestBody final TrustLineConfiguration stellarTrustLineConfig)
       throws InvalidStellarAddressException
   {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
-    this.stellarBridgeService.createCreditLine(
+
+    final String issuingStellarAddress;
+    try {
+      issuingStellarAddress = URLDecoder.decode(urlEncodedIssuingStellarAddress, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    this.stellarBridgeService.adjustTrustLine(
         mifosTenantId,
-        StellarAddress.parse(stellarTrustLineConfig.getTrustedStellarAddress()),
-        stellarTrustLineConfig.getTrustedAssetCode(),
+        StellarAddress.parse(issuingStellarAddress),
+        trustedAssetCode,
         stellarTrustLineConfig.getMaximumAmount());
-
-    return new ResponseEntity<>(HttpStatus.CREATED);
-  }
-
-  @RequestMapping(value = "/stellar/creditline/{stellarAddress}/{assetCode}"
-      , method = RequestMethod.DELETE, produces = {"application/json"})
-  public ResponseEntity<Void> deleteCreditLine(
-      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
-      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
-      @PathVariable("stellarAddress") final String stellarAddress,
-      @PathVariable("assetCode") final String assetCode)
-      throws InvalidStellarAddressException
-  {
-    this.securityService.verifyApiKey(apiKey, mifosTenantId);
-
-    this.stellarBridgeService.deleteCreditLine(
-        mifosTenantId,
-        StellarAddress.parse(stellarAddress),
-        assetCode);
 
     return new ResponseEntity<>(HttpStatus.OK);
   }
 
-  @RequestMapping(value = "/stellar/configuration", method = RequestMethod.POST,
+  @RequestMapping(value = "/stellar/bridge", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<String> createStellarBridgeConfiguration(
       @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
@@ -132,11 +130,11 @@ public class StellarBridgeController {
     return new ResponseEntity<>(newApiKey, HttpStatus.CREATED);
   }
 
-  @RequestMapping(value = "/stellar/configuration/{mifosTenantId}", method = RequestMethod.DELETE,
+  @RequestMapping(value = "/stellar/bridge", method = RequestMethod.DELETE,
       produces = {"application/json"})
   public ResponseEntity<Void> deleteAccountBridgeConfiguration(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
-      @PathVariable("mifosTenantId") final String mifosTenantId)
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId)
   {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
     this.securityService.removeApiKey(mifosTenantId);
@@ -151,8 +149,50 @@ public class StellarBridgeController {
     }
   }
 
-  @RequestMapping(value = "/stellar/account/balance/{assetCode}", method = RequestMethod.GET,
-  consumes = {"application/json"}, produces = {"application/json"})
+  @RequestMapping(value = "/stellar/bridge/vault/{assetCode}",
+      method = RequestMethod.PUT,
+      consumes = {"application/json", "text/plain;charset=ISO-8859-1"}, produces = {"application/json"})
+  public ResponseEntity<BigDecimal> adjustVaultIssuedAssets(
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @PathVariable("assetCode") final String assetCode,
+      @RequestBody final AmountConfiguration amount)
+  {
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
+    //TODO: add security for currency issuing.
+
+    final BigDecimal amountAdjustedTo
+        = stellarBridgeService.adjustVaultIssuedAssets(mifosTenantId, assetCode, amount.getAmount());
+
+    if (amountAdjustedTo.compareTo(amount.getAmount()) != 0)
+      return new ResponseEntity<>(amountAdjustedTo, HttpStatus.CONFLICT);
+    else
+      return new ResponseEntity<>(amountAdjustedTo, HttpStatus.OK);
+  }
+
+  @RequestMapping(value = "/stellar/bridge/vault/{assetCode}",
+      method = RequestMethod.GET,
+      consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<BigDecimal> getVaultIssuedAssets(
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @PathVariable("assetCode") final String assetCode)
+  {
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
+
+    if (!stellarBridgeService.tenantHasVault(mifosTenantId))
+      return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+
+    final BigDecimal vaultIssuedAssets
+        = stellarBridgeService.getVaultIssuedAssets(mifosTenantId, assetCode);
+
+    return new ResponseEntity<>(vaultIssuedAssets, HttpStatus.OK);
+  }
+
+  @RequestMapping(
+      value = "/stellar/bridge/balances/{assetCode}",
+      method = RequestMethod.GET,
+      consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<String> getStellarAccountBalance(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
@@ -165,13 +205,40 @@ public class StellarBridgeController {
         HttpStatus.OK);
   }
 
-  @RequestMapping(value = "/stellar/installationaccount/balance/{assetCode}",
-      method = RequestMethod.GET, consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<String> getInstallationAccountBalance(
-      @PathVariable("assetCode") final String assetCode)
+  @RequestMapping(
+      value = "/stellar/bridge/balances/{assetCode}/{issuer}/",
+      method = RequestMethod.GET,
+      consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<String> getStellarAccountBalanceByIssuer(
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @PathVariable("assetCode") final String assetCode,
+      @PathVariable("issuer") final String issuingStellarAddress)
   {
+    //TODO can I return a BigDecimal via a rest interface?  If so it would be better here.
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
+
     return new ResponseEntity<>(
-        stellarBridgeService.getInstallationAccountBalance(assetCode).toString(),
+        stellarBridgeService.getBalanceByIssuer(
+            mifosTenantId, assetCode,
+            StellarAddress.parse(issuingStellarAddress)).toString(),
+        HttpStatus.OK);
+  }
+
+  @RequestMapping(
+      value = "/stellar/installationaccount/balances/{assetCode}/{issuer}/",
+      method = RequestMethod.GET,
+      consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<String> getInstallationAccountBalance(
+      @PathVariable("assetCode") final String assetCode,
+      @PathVariable("issuer") final String issuingStellarAddress)
+  {
+    //TODO can I return a BigDecimal via a rest interface?  If so it would be better here.
+    return new ResponseEntity<>(
+        stellarBridgeService.getInstallationAccountBalance(
+            assetCode,
+            StellarAddress.parse(issuingStellarAddress)
+        ).toString(),
         HttpStatus.OK);
 
   }
@@ -214,7 +281,7 @@ public class StellarBridgeController {
   @ExceptionHandler
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public String handleStellarCreditLineCreationFailedException(
-      @SuppressWarnings("unused") final StellarCreditLineCreationFailedException ex)
+      @SuppressWarnings("unused") final StellarTrustLineAdjustmentFailedException ex)
   {
     return ex.getMessage();
     //TODO: figure out how to communicate missing funds problem to user.

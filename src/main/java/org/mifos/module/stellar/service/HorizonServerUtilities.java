@@ -26,6 +26,7 @@ import org.stellar.sdk.Account;
 import org.stellar.sdk.Server;
 import org.stellar.sdk.SubmitTransactionResponse;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ public class HorizonServerUtilities {
 
   @Value("${stellar.horizon-address}")
   private String serverAddress;
+  private Server server;
 
   @Value("${stellar.installation-account-private-key}")
   private String installationAccountPrivateKey;
@@ -55,6 +57,12 @@ public class HorizonServerUtilities {
     this.logger = logger;
   }
 
+  @PostConstruct
+  void init()
+  {
+    server = new Server(serverAddress);
+  }
+
   /**
    * Create an account on the stellar server to be used by a Mifos tenant.  This account will
    * need a minimum initial balance of 20 lumens, to be derived from the installation account.
@@ -70,16 +78,15 @@ public class HorizonServerUtilities {
   public KeyPair createAccount()
       throws InvalidConfigurationException, StellarAccountCreationFailedException {
 
-    final Server server = new Server(serverAddress);
     final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
     final Account installationAccount = getAccount(server, installationAccountKeyPair);
 
     final KeyPair newTenantStellarAccountKeyPair = KeyPair.random();
 
-    createAccountForKeyPair(newTenantStellarAccountKeyPair, server, installationAccountKeyPair,
+    createAccountForKeyPair(newTenantStellarAccountKeyPair, installationAccountKeyPair,
         installationAccount);
 
-    setOptionsForNewAccount(newTenantStellarAccountKeyPair, server, installationAccountKeyPair);
+    setOptionsForNewAccount(newTenantStellarAccountKeyPair, installationAccountKeyPair);
 
     return newTenantStellarAccountKeyPair;
   }
@@ -97,91 +104,46 @@ public class HorizonServerUtilities {
    * @throws InvalidConfigurationException if the horizon server named in the configuration cannot
    * be reached.  Either the address is wrong or the horizon server named is't running, or there is
    * a problem with the network.
-   * @throws StellarCreditLineCreationFailedException if the creation of the trustline failed for any
+   * @throws StellarTrustLineAdjustmentFailedException if the creation of the trustline failed for any
    * other reason.
    */
-  public void setCreditLineSize(
+  public BigDecimal setTrustLineSize(
       final char[] stellarAccountPrivateKey,
-      final String addressOfStellarAccountToTrust,
+      final StellarAccountId addressOfStellarAccountToTrust,
       final String assetCode,
       final BigDecimal maximumAmount)
-      throws InvalidConfigurationException, StellarCreditLineCreationFailedException
+      throws InvalidConfigurationException, StellarTrustLineAdjustmentFailedException
   {
-    final Server server = new Server(serverAddress);
-
     final KeyPair trustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final Account trustingAccount = getAccount(server, trustingAccountKeyPair);
+
+
+    final KeyPair keyPairOfStellarAccountToTrust
+        = KeyPair.fromAccountId(addressOfStellarAccountToTrust.getPublicKey());
+
+    final Asset asset = Asset.createNonNativeAsset(assetCode, keyPairOfStellarAccountToTrust);
+
+    final BigDecimal balance = getBalanceOfAsset(trustingAccount, asset);
+
+    //Can't make it smaller than the balance
+    final BigDecimal trustSize = balance.max(maximumAmount);
 
     final Transaction.Builder trustTransactionBuilder =
         new Transaction.Builder(trustingAccount);
 
-    final KeyPair keyPairOfStellarAccountToTrust
-        = KeyPair.fromAccountId(addressOfStellarAccountToTrust);
-
-    final Asset assetToTrust = Asset.createNonNativeAsset(assetCode, keyPairOfStellarAccountToTrust);
-
     final ChangeTrustOperation trustOperation =
-        new ChangeTrustOperation.Builder(assetToTrust, maximumAmount.toPlainString()).build();
-
-    final Asset inverseAsset = Asset.createNonNativeAsset(assetCode, trustingAccountKeyPair);
-
-    final ManageOfferOperation offerOperation =
-        new ManageOfferOperation.Builder(inverseAsset, assetToTrust,
-            maximumAmount.toPlainString(), "1").build();
+        new ChangeTrustOperation.Builder(asset, bigDecimalToStellarBalance(trustSize)).build();
 
     trustTransactionBuilder.addOperation(trustOperation);
-    trustTransactionBuilder.addOperation(offerOperation);
-
 
     final Transaction trustTransaction = trustTransactionBuilder.build();
 
     trustTransaction.sign(trustingAccountKeyPair);
 
-    submitTransaction(server, trustTransaction,
-        StellarCreditLineCreationFailedException::trustLineTransactionFailed);
-  }
+    submitTransaction(
+        trustTransaction, StellarTrustLineAdjustmentFailedException::trustLineTransactionFailed);
 
-  public void minimizeCreditLine(
-      final char[] stellarAccountPrivateKey,
-      final String addressOfStellarAccountToUntrust,
-      final String assetCode)
-      throws InvalidConfigurationException, StellarCreditLineCreationFailedException
-  {
-
-    final Server server = new Server(serverAddress);
-
-    final KeyPair untrustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
-    final Account untrustingAccount = getAccount(server, untrustingAccountKeyPair);
-
-
-    final Transaction.Builder untrustTransactionBuilder =
-        new Transaction.Builder(untrustingAccount);
-
-    final KeyPair keyPairOfStellarAccountToUntrust
-        = KeyPair.fromAccountId(addressOfStellarAccountToUntrust);
-
-    final Asset assetToUntrust = Asset.createNonNativeAsset(assetCode, keyPairOfStellarAccountToUntrust);
-
-    final BigDecimal balance = getBalanceOfCreditsInAsset(untrustingAccount, assetToUntrust);
-
-    final ChangeTrustOperation untrustOperation =
-        new ChangeTrustOperation.Builder(assetToUntrust, balance.toPlainString()).build();
-
-    final Asset inverseAsset = Asset.createNonNativeAsset(assetCode, untrustingAccountKeyPair);
-
-    final ManageOfferOperation offerOperation =
-        new ManageOfferOperation.Builder(inverseAsset, assetToUntrust,
-            "0", "1").build();
-
-    untrustTransactionBuilder.addOperation(untrustOperation);
-    untrustTransactionBuilder.addOperation(offerOperation);
-
-    final Transaction untrustTransaction = untrustTransactionBuilder.build();
-
-    untrustTransaction.sign(untrustingAccountKeyPair);
-
-    submitTransaction(server, untrustTransaction,
-        StellarCreditLineCreationFailedException::trustLineTransactionFailed);
+    return trustSize;
   }
 
   public void pay(
@@ -191,23 +153,13 @@ public class HorizonServerUtilities {
       final char[] stellarAccountPrivateKey)
       throws InvalidConfigurationException, StellarPaymentFailedException
   {
-    final Server server = new Server(serverAddress);
     final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
 
     final Asset sendAsset = Asset.createNonNativeAsset(assetCode, sourceAccountKeyPair);
     final Asset receiveAsset = Asset.createNonNativeAsset(assetCode, targetAccountKeyPair);
 
-    final Account sourceAccount;
-    final BigDecimal balanceOfAssetCreditsFromTarget;
-    try {
-      sourceAccount = server.accounts().account(sourceAccountKeyPair);
-      balanceOfAssetCreditsFromTarget = getBalanceOfCreditsInAsset(sourceAccount, receiveAsset);
-
-    }
-    catch (final IOException e) {
-      throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
-    }
+    final Account sourceAccount = getAccount(server, sourceAccountKeyPair);
 
     final Transaction.Builder transferTransactionBuilder = new Transaction.Builder(sourceAccount);
     final PathPaymentOperation paymentOperation =
@@ -215,24 +167,11 @@ public class HorizonServerUtilities {
             sendAsset,
             bigDecimalToStellarBalance(amount),
             targetAccountKeyPair,
-            receiveAsset,
+            sendAsset,
             bigDecimalToStellarBalance(amount))
             .setSourceAccount(sourceAccountKeyPair).build();
 
     transferTransactionBuilder.addOperation(paymentOperation);
-
-    if (balanceOfAssetCreditsFromTarget.compareTo(BigDecimal.ZERO) != 0)
-    {
-      final ManageOfferOperation tradeOfferOperation =
-          new ManageOfferOperation.Builder(
-              receiveAsset,
-              sendAsset,
-              bigDecimalToStellarBalance(balanceOfAssetCreditsFromTarget),
-              bigDecimalToStellarBalance(balanceOfAssetCreditsFromTarget))
-              .setSourceAccount(sourceAccountKeyPair)
-              .build();
-      transferTransactionBuilder.addOperation(tradeOfferOperation);
-    }
 
     if (targetAccountId.getSubAccount().isPresent())
     {
@@ -244,16 +183,42 @@ public class HorizonServerUtilities {
     transferTransaction.sign(sourceAccountKeyPair);
 
 
-    submitTransaction(server, transferTransaction, StellarPaymentFailedException::new);
+    submitTransaction(transferTransaction, StellarPaymentFailedException::new);
   }
 
   public BigDecimal getBalance(
-      final char[] stellarAccountPrivateKey,
+      final StellarAccountId stellarAccountId,
       final String assetCode)
   {
-    final Server server = new Server(serverAddress);
-    final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
+    final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
+    return getBalance(accountKeyPair, assetCode);
+  }
 
+  public BigDecimal getInstallationAccountBalance(
+      final String assetCode,
+      final StellarAccountId issuingStellarAccountId) {
+    final StellarAccountId installationAccountId = StellarAccountId.mainAccount(
+        KeyPair.fromSecretSeed(installationAccountPrivateKey).getAccountId());
+    return this.getBalanceByIssuer(installationAccountId, assetCode, issuingStellarAccountId);
+  }
+
+  public BigDecimal getBalanceByIssuer(
+      final StellarAccountId stellarAccountId,
+      final String assetCode,
+      final StellarAccountId accountIdOfIssuingStellarAddress)
+  {
+    final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
+    final KeyPair issuingAccountKeyPair
+        = KeyPair.fromAccountId(accountIdOfIssuingStellarAddress.getPublicKey());
+
+    final Account account = getAccount(server, accountKeyPair);
+
+    final Asset asset = Asset.createNonNativeAsset(assetCode, issuingAccountKeyPair);
+
+    return getBalanceOfAsset(account, asset);
+  }
+
+  private BigDecimal getBalance(final KeyPair accountKeyPair, final String assetCode) {
     final Account tenantAccount = getAccount(server, accountKeyPair);
     final Account.Balance[] balances = tenantAccount.getBalances();
 
@@ -263,14 +228,19 @@ public class HorizonServerUtilities {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
+  public BigDecimal currencyIssued(final StellarAccountId issuingAccountId, final String assetCode)
+  {
+    final KeyPair issuingAccountKeyPair = KeyPair.fromAccountId(issuingAccountId.getPublicKey());
 
-  public BigDecimal getInstallationAccountBalance(final String assetCode) {
-    return this.getBalance(installationAccountPrivateKey.toCharArray(), assetCode);
+    final Account issuingAccount = getAccount(server, issuingAccountKeyPair);
+    final Asset asset = Asset.createNonNativeAsset(assetCode, issuingAccountKeyPair);
+
+    //TODO: I'm just guessing that this will work this way... Check it.
+    return getBalanceOfAsset(issuingAccount, asset);
   }
 
   private void createAccountForKeyPair(
       final KeyPair newAccountKeyPair,
-      final Server server,
       final KeyPair installationAccountKeyPair,
       final Account installationAccount)
       throws InvalidConfigurationException, StellarAccountCreationFailedException
@@ -295,12 +265,11 @@ public class HorizonServerUtilities {
 
     createAccountTransaction.sign(installationAccountKeyPair);
 
-    submitTransaction(server, createAccountTransaction, StellarAccountCreationFailedException::new);
+    submitTransaction(createAccountTransaction, StellarAccountCreationFailedException::new);
   }
 
   private void setOptionsForNewAccount(
       final KeyPair newAccountKeyPair,
-      final Server server,
       final KeyPair installationAccountKeyPair)
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
@@ -322,7 +291,7 @@ public class HorizonServerUtilities {
     final Transaction setOptionsTransaction = transactionBuilder.build();
 
     setOptionsTransaction.sign(newAccountKeyPair);
-    submitTransaction(server, setOptionsTransaction, StellarAccountCreationFailedException::new);
+    submitTransaction(setOptionsTransaction, StellarAccountCreationFailedException::new);
   }
 
   private Account getAccount(final Server server, final KeyPair installationAccountKeyPair)
@@ -349,7 +318,6 @@ public class HorizonServerUtilities {
   }
 
   private <T extends Exception> void submitTransaction(
-      final Server server,
       final Transaction transaction,
       final TransactionFailedException<T> failureHandler) throws T
   {
@@ -366,7 +334,7 @@ public class HorizonServerUtilities {
     }
   }
 
-  private BigDecimal getBalanceOfCreditsInAsset(
+  private BigDecimal getBalanceOfAsset(
       final Account sourceAccount,
       final Asset asset)
   {

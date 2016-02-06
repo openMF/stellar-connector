@@ -26,6 +26,7 @@ public class StellarAddress {
   private final InternetDomainName domain;
   private final String tenantName;
   private final Optional<String> userAccountId;
+  private final boolean isVaultAddress;
 
   public static StellarAddress forTenant(final String tenantName, final String domain)
   {
@@ -79,11 +80,22 @@ public class StellarAddress {
   {
     this.domain = domain;
     this.tenantName = tenantName;
-    this.userAccountId = userAccountId;
+    if (userAccountId.orElse("").equals("vault")) {
+      isVaultAddress = true;
+      this.userAccountId = Optional.empty();
+    }
+    else
+    {
+      isVaultAddress = false;
+      this.userAccountId = userAccountId;
+    }
   }
 
   public String toString() {
-    if (userAccountId.isPresent()) {
+    if (isVaultAddress) {
+      return tenantName + ":" + "vault" + "*" + domain.toString();
+    }
+    else if (userAccountId.isPresent()) {
       return tenantName + ":" + userAccountId.get() + "*" + domain.toString();
     }
     else
@@ -102,5 +114,9 @@ public class StellarAddress {
 
   public Optional<String> getUserAccountId() {
     return userAccountId;
+  }
+
+  public boolean isVaultAddress() {
+    return isVaultAddress;
   }
 }

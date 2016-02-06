@@ -19,11 +19,13 @@ import com.google.gson.Gson;
 import com.jayway.restassured.internal.mapper.ObjectMapperType;
 import com.jayway.restassured.response.Header;
 import com.jayway.restassured.response.Response;
+import org.junit.Assert;
 import org.mifos.module.stellar.restdomain.*;
 import org.springframework.http.HttpStatus;
 
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
-import java.util.Collections;
+import java.net.URLEncoder;
 
 import static com.jayway.restassured.RestAssured.given;
 import static org.mifos.module.stellar.AccountBalanceMatcher.balanceMatches;
@@ -47,7 +49,7 @@ public class StellarBridgeTestHelpers {
         new AccountBridgeConfiguration(tenantName, "token_" + tenantName);
     final Response creationResponse
         = given().header(CONTENT_TYPE_HEADER)
-        .body(newAccount).post("/modules/stellar/configuration");
+        .body(newAccount).post("/modules/stellar/bridge");
 
     creationResponse
         .then().assertThat().statusCode(HttpStatus.CREATED.value());
@@ -55,48 +57,81 @@ public class StellarBridgeTestHelpers {
     return creationResponse.getBody().as(String.class, ObjectMapperType.GSON);
   }
 
+  public static void createVault(
+      final String tenantName,
+      final String apiKey,
+      final String assetCode,
+      final BigDecimal balance)
+  {
+    final AmountConfiguration amount = new AmountConfiguration(balance);
+
+    given()
+        .header(CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
+        .pathParameter("assetCode", assetCode)
+        .body(amount)
+        .put("/modules/stellar/bridge/vault/{assetCode}/")
+        .then().assertThat().statusCode(HttpStatus.OK.value());
+  }
+
   public static void deleteBridge(final String tenantName, final String apiKey)
   {
     final Response deletionResponse =
-        given().header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
-            .delete("/modules/stellar/configuration/{mifosTenantId}",
-                Collections.singletonMap("mifosTenantId", tenantName));
+        given()
+            .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+            .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
+            .delete("/modules/stellar/bridge");
 
     deletionResponse
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
-  public static void createCreditLine(
+  public static void createTrustLine(
       final String fromTenant,
       final String fromTenantApiKey,
-      final String toTenant,
+      final String toStellarAddress,
       final String assetCode,
       final BigDecimal amount) {
+    final TrustLineConfiguration trustLine = new TrustLineConfiguration(amount);
 
-    final String toTenantStellarAddress = tenantStellarAddress(toTenant);
-    final TrustLineConfiguration trustLine =
-        new TrustLineConfiguration(toTenantStellarAddress, assetCode, amount);
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode(toStellarAddress, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
 
     given().header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
         .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, fromTenantApiKey)
-        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, fromTenant).body(trustLine)
-        .post("/modules/stellar/creditline").then().assertThat().statusCode(HttpStatus.CREATED.value());
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, fromTenant)
+        .pathParameter("assetCode", assetCode)
+        .pathParameter("issuer", issuer)
+        .body(trustLine)
+        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
-  public static void deleteCreditLine(
+  public static void deleteTrustLine(
       final String fromTenant,
       final String fromTenantApiKey,
-      final String toTenant,
+      final String toStellarAddress,
       final String assetCode)
   {
-    final String toTenantStellarAddress = tenantStellarAddress(toTenant);
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode(toStellarAddress, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
 
-    given()
+    given().header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
         .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL,fromTenantApiKey)
         .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, fromTenant)
-        .pathParam("stellarAddress", toTenantStellarAddress)
         .pathParam("assetCode", assetCode)
-        .delete("/modules/stellar/creditline/{stellarAddress}/{assetCode}")
+        .pathParam("issuer", issuer)
+        .body(new TrustLineConfiguration(BigDecimal.ZERO))
+        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
@@ -119,7 +154,7 @@ public class StellarBridgeTestHelpers {
         .header(ENTITY_HEADER_LABEL, ENTITY_HEADER_VALUE)
         .header(ACTION_HEADER_LABEL, ACTION_HEADER_VALUE)
         .body(payment1)
-        .post("/modules/stellar/payments")
+        .post("/modules/stellar/bridge/payments")
         .then().assertThat().statusCode(HttpStatus.CREATED.value());
   }
 
@@ -127,20 +162,29 @@ public class StellarBridgeTestHelpers {
       final String tenant,
       final String tenantApiKey,
       final String assetCode,
+      final String issuingStellarAddress,
       final BigDecimal amount)
   {
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode(issuingStellarAddress, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
+
     given().header(CONTENT_TYPE_HEADER)
         .header(API_KEY_HEADER_LABEL, tenantApiKey)
         .header(TENANT_ID_HEADER_LABEL, tenant)
         .pathParam("assetCode", assetCode)
-        .get("/modules/stellar/account/balance/{assetCode}")
+        .pathParam("issuer", issuer)
+        .get("/modules/stellar/bridge/balances/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(amount));
   }
 
-  public static String tenantStellarAddress(final String tenantId)
+  public static String tenantVaultStellarAddress(final String tenantId)
   {
-    return tenantId + "*" + TEST_ADDRESS_DOMAIN;
+    return tenantId + ":vault" + "*" + TEST_ADDRESS_DOMAIN;
   }
 
   static String getPaymentPayload(

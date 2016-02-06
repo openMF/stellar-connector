@@ -22,7 +22,7 @@ import org.mifos.module.stellar.federation.StellarAddress;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.service.HorizonServerUtilities;
 import org.mifos.module.stellar.service.StellarAddressResolver;
-import org.mifos.module.stellar.repository.AccountBridgeEncodedRepository;
+import org.mifos.module.stellar.repository.AccountBridgeRepositoryDecorator;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,18 +32,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
 
-  private final AccountBridgeEncodedRepository accountBridgeEncodedRepository;
+  private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
   private final Logger logger;
 
   @Autowired
   public PaymentEventListener(
-      final AccountBridgeEncodedRepository accountBridgeEncodedRepository,
+      final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
-    this.accountBridgeEncodedRepository = accountBridgeEncodedRepository;
+    this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
     this.logger = logger;
@@ -66,7 +66,7 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
     }
 
     final char[] decodedStellarPrivateKey =
-        accountBridgeEncodedRepository.getPrivateKey(paymentPayload.sourceTenantId);
+        accountBridgeRepositoryDecorator.getStellarAccountPrivateKey(paymentPayload.sourceTenantId);
 
     horizonServerUtilities.pay(
         targetAccountId,

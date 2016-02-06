@@ -35,6 +35,7 @@ public class StellarAddressTest {
     private String expectedTenantName = null;
     private Optional<String> expectedUserAccountId = Optional.empty();
     private InternetDomainName expectedDomain = null;
+    private boolean expectedVaultAddress = false;
     private boolean exceptionExpected = false;
 
     TestCase inputedStringAddress(final String value)
@@ -61,6 +62,11 @@ public class StellarAddressTest {
       return this;
     }
 
+    public TestCase expectedVaultAddress() {
+      expectedVaultAddress = true;
+      return this;
+    }
+
     TestCase exceptionExpected(final boolean value)
     {
       exceptionExpected = value;
@@ -82,6 +88,8 @@ public class StellarAddressTest {
     Optional<String> getExpectedUserAccountId() {
       return expectedUserAccountId;
     }
+
+    boolean getExpectedVaultAddress() { return expectedVaultAddress; }
 
     boolean getExceptionExpected() {
       return exceptionExpected;
@@ -151,6 +159,13 @@ public class StellarAddressTest {
         .inputedStringAddress("")
         .exceptionExpected(true));
 
+    ret.add(new TestCase()
+    .inputedStringAddress("x:vault*star.com")
+        .expectedDomain("star.com")
+        .expectedTenantName("x")
+        .expectedVaultAddress());
+
+
     return ret;
   }
 
@@ -164,6 +179,7 @@ public class StellarAddressTest {
       assertEquals(testCase.getExpectedDomain(), result.getDomain());
       assertEquals(testCase.getExpectedTenantName(), result.getTenantName());
       assertEquals(testCase.getExpectedUserAccountId(), result.getUserAccountId());
+      assertEquals(testCase.getExpectedVaultAddress(), result.isVaultAddress());
 
       assertEquals(testCase.getInputedStringAddress(), result.toString());
     }

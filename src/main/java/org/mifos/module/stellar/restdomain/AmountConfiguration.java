@@ -17,18 +17,19 @@ package org.mifos.module.stellar.restdomain;
 
 import java.math.BigDecimal;
 
-public class TrustLineConfiguration {
+public class AmountConfiguration {
 
-  private BigDecimal maximumAmount;
+  private BigDecimal amount;
+
 
   @SuppressWarnings("unused") //needed for Json Mapping.
-  TrustLineConfiguration() {super();}
+  AmountConfiguration() {super();}
 
-  public TrustLineConfiguration(final BigDecimal maximumAmount) {
-    this.maximumAmount = maximumAmount;
+  public AmountConfiguration(final BigDecimal amount) {
+    this.amount = amount;
   }
 
-  public BigDecimal getMaximumAmount() {
-    return maximumAmount;
+  public BigDecimal getAmount() {
+    return amount;
   }
 }

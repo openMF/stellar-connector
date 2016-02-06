@@ -74,16 +74,25 @@ public class LocalFederationService {
       throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
     }
 
-    final String publicKey = accountBridge.getStellarAccountId();
-    //TODO: check here that the public and private keys match. Broken data integrity would mean
-    //TODO: the user would have no access to his or her funds if they don't match.
+    if (stellarAddress.isVaultAddress())
+    {
+      if (accountBridge.getStellarVaultAccountId() == null)
+        throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
+      else
+        return StellarAccountId.mainAccount(accountBridge.getStellarVaultAccountId());
+    }
+    else {
+      final String accountId = accountBridge.getStellarAccountId();
 
+      if (!userAccountId.isPresent()) {
+        return StellarAccountId.mainAccount(accountId);
+      } else {
+        //TODO: check that an account under this account id actually exists.
+        return StellarAccountId.subAccount(accountId, userAccountId.get());
+      }
 
-    if (!userAccountId.isPresent()) {
-      return StellarAccountId.mainAccount(publicKey);
-    } else {
-      //TODO: check that an account under this account id actually exists.
-      return StellarAccountId.subAccount(publicKey, userAccountId.get());
+      //TODO: check here that the public and private keys match. Broken data integrity would mean
+      //TODO: the user would have no access to his or her funds if they don't match.
     }
   }
 }
