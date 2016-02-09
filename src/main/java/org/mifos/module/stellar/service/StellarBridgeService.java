@@ -215,7 +215,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
         = StellarAccountId.mainAccount(bridge.getStellarAccountId());
 
     final BigDecimal currentVaultIssuedAssets =
-        horizonServerUtilities.currencyIssued(stellarVaultAccountId, assetCode);
+        horizonServerUtilities.currencyTrustSize(stellarAccountId, assetCode, stellarVaultAccountId);
 
     final BigDecimal adjustmentRequired = amount.subtract(currentVaultIssuedAssets);
 
@@ -229,10 +229,12 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
 
       final BigDecimal finalBalance = currentVaultIssuedAssets.subtract(adjustmentPossible);
 
-      horizonServerUtilities.pay(
+      horizonServerUtilities.simplePay(
           stellarVaultAccountId,
           adjustmentPossible,
-          assetCode, stellarVaultAccountPrivateKey);
+          assetCode,
+          stellarVaultAccountId,
+          stellarVaultAccountPrivateKey);
 
       horizonServerUtilities.setTrustLineSize(
           bridge.getStellarAccountPrivateKey(), stellarVaultAccountId, assetCode,
@@ -246,11 +248,12 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
           bridge.getStellarAccountPrivateKey(), stellarVaultAccountId, assetCode,
           amount.add(BigDecimal.ONE));
 
-      horizonServerUtilities.pay(
+      horizonServerUtilities.simplePay(
           stellarAccountId,
           adjustmentRequired,
           assetCode,
-          bridge.getStellarVaultAccountPrivateKey());
+          stellarVaultAccountId,
+          stellarVaultAccountPrivateKey);
 
       return amount;
     }
@@ -272,13 +275,17 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
       final String mifosTenantId,
       final String assetCode) {
 
+    final StellarAccountId stellarAccountId =
+        accountBridgeRepositoryDecorator.getStellarAccountId(mifosTenantId);
+
     final StellarAccountId stellarVaultAccountId
         = accountBridgeRepositoryDecorator.getStellarVaultAccountId(mifosTenantId);
 
     if (stellarVaultAccountId == null)
       return BigDecimal.ZERO;
 
-    return horizonServerUtilities.currencyIssued(stellarVaultAccountId, assetCode);
+    return horizonServerUtilities.currencyTrustSize(
+        stellarAccountId, assetCode, stellarVaultAccountId);
   }
 
   private KeyPair createVaultAccount(final AccountBridgePersistency bridge) {

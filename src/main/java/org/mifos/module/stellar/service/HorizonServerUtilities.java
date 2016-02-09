@@ -95,7 +95,7 @@ public class HorizonServerUtilities {
    * Creates a line of trust between stellar accounts for one currency, and up to a maximum amount.
    *
    * @param stellarAccountPrivateKey the key of the account doing the trusting
-   * @param addressOfStellarAccountToTrust the account Id of the account to be trusted.
+   * @param issuingStellarAccountId the account Id of the account to be trusted.
    * @param assetCode the currency symbol of the currency to be trusted.  See
    *                 https://www.stellar.org/developers/learn/concepts/assets.html
    *                 for a description of how to create a valid asset code.
@@ -109,7 +109,7 @@ public class HorizonServerUtilities {
    */
   public BigDecimal setTrustLineSize(
       final char[] stellarAccountPrivateKey,
-      final StellarAccountId addressOfStellarAccountToTrust,
+      final StellarAccountId issuingStellarAccountId,
       final String assetCode,
       final BigDecimal maximumAmount)
       throws InvalidConfigurationException, StellarTrustLineAdjustmentFailedException
@@ -117,11 +117,7 @@ public class HorizonServerUtilities {
     final KeyPair trustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final Account trustingAccount = getAccount(server, trustingAccountKeyPair);
 
-
-    final KeyPair keyPairOfStellarAccountToTrust
-        = KeyPair.fromAccountId(addressOfStellarAccountToTrust.getPublicKey());
-
-    final Asset asset = Asset.createNonNativeAsset(assetCode, keyPairOfStellarAccountToTrust);
+    final Asset asset = getAsset(assetCode, issuingStellarAccountId);
 
     final BigDecimal balance = getBalanceOfAsset(trustingAccount, asset);
 
@@ -146,18 +142,32 @@ public class HorizonServerUtilities {
     return trustSize;
   }
 
+  public void simplePay(
+      final StellarAccountId targetAccountId,
+      final BigDecimal amount,
+      final String assetCode,
+      final StellarAccountId issuingAccountId,
+      final char[] stellarAccountPrivateKey)
+      throws InvalidConfigurationException, StellarPaymentFailedException
+  {
+    pay(targetAccountId, amount, assetCode,
+        issuingAccountId, issuingAccountId, stellarAccountPrivateKey);
+  }
+
   public void pay(
       final StellarAccountId targetAccountId,
       final BigDecimal amount,
       final String assetCode,
+      final StellarAccountId sourceIssuer,
+      final StellarAccountId targetIssuer,
       final char[] stellarAccountPrivateKey)
       throws InvalidConfigurationException, StellarPaymentFailedException
   {
     final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
 
-    final Asset sendAsset = Asset.createNonNativeAsset(assetCode, sourceAccountKeyPair);
-    final Asset receiveAsset = Asset.createNonNativeAsset(assetCode, targetAccountKeyPair);
+    final Asset sendAsset = getAsset(assetCode, sourceIssuer);
+    final Asset receiveAsset = getAsset(assetCode, targetIssuer);
 
     final Account sourceAccount = getAccount(server, sourceAccountKeyPair);
 
@@ -167,7 +177,7 @@ public class HorizonServerUtilities {
             sendAsset,
             bigDecimalToStellarBalance(amount),
             targetAccountKeyPair,
-            sendAsset,
+            receiveAsset,
             bigDecimalToStellarBalance(amount))
             .setSourceAccount(sourceAccountKeyPair).build();
 
@@ -184,6 +194,10 @@ public class HorizonServerUtilities {
 
 
     submitTransaction(transferTransaction, StellarPaymentFailedException::new);
+  }
+
+  private Asset getAsset(final String assetCode, final StellarAccountId targetIssuer) {
+    return Asset.createNonNativeAsset(assetCode, KeyPair.fromAccountId(targetIssuer.getPublicKey()));
   }
 
   public BigDecimal getBalance(
@@ -208,12 +222,10 @@ public class HorizonServerUtilities {
       final StellarAccountId accountIdOfIssuingStellarAddress)
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
-    final KeyPair issuingAccountKeyPair
-        = KeyPair.fromAccountId(accountIdOfIssuingStellarAddress.getPublicKey());
 
     final Account account = getAccount(server, accountKeyPair);
 
-    final Asset asset = Asset.createNonNativeAsset(assetCode, issuingAccountKeyPair);
+    final Asset asset = getAsset(assetCode, accountIdOfIssuingStellarAddress);
 
     return getBalanceOfAsset(account, asset);
   }
@@ -228,15 +240,17 @@ public class HorizonServerUtilities {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
-  public BigDecimal currencyIssued(final StellarAccountId issuingAccountId, final String assetCode)
+  public BigDecimal currencyTrustSize(
+      final StellarAccountId trustingAccountId,
+      final String assetCode,
+      final StellarAccountId issuingAccountId)
   {
-    final KeyPair issuingAccountKeyPair = KeyPair.fromAccountId(issuingAccountId.getPublicKey());
+    final KeyPair trustingAccountKeyPair = KeyPair.fromAccountId(trustingAccountId.getPublicKey());
 
-    final Account issuingAccount = getAccount(server, issuingAccountKeyPair);
-    final Asset asset = Asset.createNonNativeAsset(assetCode, issuingAccountKeyPair);
+    final Account trustingAccount = getAccount(server, trustingAccountKeyPair);
+    final Asset asset = getAsset(assetCode, issuingAccountId);
 
-    //TODO: I'm just guessing that this will work this way... Check it.
-    return getBalanceOfAsset(issuingAccount, asset);
+    return getBalanceOfAsset(trustingAccount, asset);
   }
 
   private void createAccountForKeyPair(

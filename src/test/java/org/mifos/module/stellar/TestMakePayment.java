@@ -43,7 +43,9 @@ import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
 public class TestMakePayment {
 
   public static final String ASSET_CODE = "XXX";
-  public static final BigDecimal TRUST_LIMIT = BigDecimal.valueOf(1000);
+  public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
+  public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
+
   @Value("${local.server.port}")
   int bridgePort;
 
@@ -71,31 +73,30 @@ public class TestMakePayment {
     RestAssured.port = bridgePort;
 
     firstTenantId = UUID.randomUUID().toString();
-    firstTenantApiKey = createBridge(firstTenantId);
+    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup);
+    setVaultSize(firstTenantId, firstTenantApiKey, ASSET_CODE, VAULT_BALANCE);
     final String firstTenantVaultAddress = tenantVaultStellarAddress(firstTenantId);
-    testCleanup.addStep(() -> deleteBridge(firstTenantId, firstTenantApiKey));
 
     secondTenantId = UUID.randomUUID().toString();
-    secondTenantApiKey = createBridge(secondTenantId);
+    secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup);
+    setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, VAULT_BALANCE);
     final String secondTenantVaultAddress = tenantVaultStellarAddress(firstTenantId);
-    testCleanup.addStep(() -> deleteBridge(secondTenantId, secondTenantApiKey));
 
     thirdTenantId = UUID.randomUUID().toString();
-    thirdTenantApiKey = createBridge(thirdTenantId);
-    testCleanup.addStep(() -> deleteBridge(thirdTenantId, thirdTenantApiKey));
+    thirdTenantApiKey = createAndDestroyBridge(thirdTenantId, testCleanup);
 
 
-    createTrustLine(
-        secondTenantId, secondTenantApiKey, firstTenantVaultAddress, ASSET_CODE, TRUST_LIMIT);
-    testCleanup.addStep(
-        () -> deleteTrustLine(
-            secondTenantId, secondTenantApiKey, firstTenantVaultAddress, ASSET_CODE));
+    createAndDestroyTrustLine(
+        secondTenantId, secondTenantApiKey, firstTenantVaultAddress, ASSET_CODE, TRUST_LIMIT,
+        testCleanup);
 
-    createTrustLine(
-        firstTenantId, firstTenantApiKey, secondTenantVaultAddress, ASSET_CODE, TRUST_LIMIT);
-    testCleanup.addStep(
-        () -> deleteTrustLine(
-            firstTenantId, firstTenantApiKey, secondTenantVaultAddress, ASSET_CODE));
+    createAndDestroyTrustLine(
+        firstTenantId, firstTenantApiKey, secondTenantVaultAddress, ASSET_CODE, TRUST_LIMIT,
+        testCleanup);
+
+    createAndDestroyTrustLine(
+        thirdTenantId, thirdTenantApiKey, secondTenantVaultAddress, ASSET_CODE, TRUST_LIMIT,
+        testCleanup);
   }
 
   @After
@@ -217,7 +218,8 @@ public class TestMakePayment {
 
 
   @Test
-  public void paymentSumApproachesCreditLimit() throws InterruptedException {
+  public void paymentSumApproachesCreditLimit() throws InterruptedException
+  {
     //Approach the credit limit, then go back down to zero.
     Collections.nCopies(10, BigDecimal.valueOf(99.99))
         .parallelStream()
@@ -268,9 +270,5 @@ public class TestMakePayment {
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         TRUST_LIMIT);
-  }
-
-  public void waitForPaymentToComplete() throws InterruptedException {
-    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
   }
 }

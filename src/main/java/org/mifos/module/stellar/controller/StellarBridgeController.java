@@ -213,10 +213,17 @@ public class StellarBridgeController {
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @PathVariable("assetCode") final String assetCode,
-      @PathVariable("issuer") final String issuingStellarAddress)
+      @PathVariable("issuer") final String urlEncodedIssuingStellarAddress)
   {
     //TODO can I return a BigDecimal via a rest interface?  If so it would be better here.
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
+
+    final String issuingStellarAddress;
+    try {
+      issuingStellarAddress = URLDecoder.decode(urlEncodedIssuingStellarAddress, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
     return new ResponseEntity<>(
         stellarBridgeService.getBalanceByIssuer(

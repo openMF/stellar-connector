@@ -43,13 +43,21 @@ public class StellarBridgeTestHelpers {
   /**
    * @return the api key used when accessing the tenantName
    */
-  public static String createBridge(final String tenantName)
+  public static String createAndDestroyBridge(final String tenantName, final Cleanup testCleanup)
   {
+    final String apiKey = createBridge(tenantName);
+    testCleanup.addStep(() -> deleteBridge(tenantName, apiKey));
+    return apiKey;
+  }
+
+  private static String createBridge(final String tenantName) {
     final AccountBridgeConfiguration newAccount =
         new AccountBridgeConfiguration(tenantName, "token_" + tenantName);
-    final Response creationResponse
-        = given().header(CONTENT_TYPE_HEADER)
-        .body(newAccount).post("/modules/stellar/bridge");
+    final Response creationResponse =
+        given()
+            .header(CONTENT_TYPE_HEADER)
+            .body(newAccount)
+            .post("/modules/stellar/bridge");
 
     creationResponse
         .then().assertThat().statusCode(HttpStatus.CREATED.value());
@@ -57,7 +65,20 @@ public class StellarBridgeTestHelpers {
     return creationResponse.getBody().as(String.class, ObjectMapperType.GSON);
   }
 
-  public static void createVault(
+  public static void deleteBridge(final String tenantName, final String apiKey)
+  {
+    final Response deletionResponse =
+        given()
+            .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+            .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
+            .delete("/modules/stellar/bridge");
+
+    deletionResponse
+        .then().assertThat().statusCode(HttpStatus.OK.value());
+  }
+
+
+  public static void setVaultSize(
       final String tenantName,
       final String apiKey,
       final String assetCode,
@@ -75,21 +96,33 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
-  public static void deleteBridge(final String tenantName, final String apiKey)
-  {
-    final Response deletionResponse =
-        given()
-            .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
-            .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
-            .delete("/modules/stellar/bridge");
-
-    deletionResponse
-        .then().assertThat().statusCode(HttpStatus.OK.value());
+  public static void checkVaultSize(
+      final String tenantId,
+      final String apiKey,
+      final String assetCode,
+      final BigDecimal balance) {
+    given()
+        .header(CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
+        .pathParameter("assetCode", assetCode)
+        .get("/modules/stellar/bridge/vault/{assetCode}/")
+        .then().assertThat().statusCode(HttpStatus.OK.value())
+        .content(balanceMatches(balance));
   }
 
-  public static void createTrustLine(
-      final String fromTenant,
-      final String fromTenantApiKey,
+  public static void createAndDestroyTrustLine(
+      final String fromTenant, final String fromTenantApiKey,
+      final String toStellarAddress, final String assetCode, final BigDecimal amount,
+      final Cleanup testCleanup) {
+    createTrustLine(fromTenant, fromTenantApiKey, toStellarAddress, assetCode, amount);
+    testCleanup.addStep(
+        () -> deleteTrustLine(
+            fromTenant, fromTenantApiKey, toStellarAddress, assetCode));
+  }
+
+  private static void createTrustLine(
+      final String fromTenant, final String fromTenantApiKey,
       final String toStellarAddress,
       final String assetCode,
       final BigDecimal amount) {
@@ -135,6 +168,24 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
+  public static void createSameCurrencyPassiveOffer(
+      final String marketMakerTenantId, final String marketMakerTenantApiKey,
+      final String assetCode, final BigDecimal maximumAmount,
+      final String buyingIssuerAddress, final String sellingIssuerAddress)
+  {
+    final PassiveOfferData offer = new PassiveOfferData(
+        assetCode, buyingIssuerAddress,
+        assetCode, sellingIssuerAddress,
+        maximumAmount, BigDecimal.ONE);
+
+    given().header(CONTENT_TYPE_HEADER)
+        .header(API_KEY_HEADER_LABEL, marketMakerTenantApiKey)
+        .header(TENANT_ID_HEADER_LABEL, marketMakerTenantId)
+        .body(offer)
+        .post("/modules/stellar/bridge/market/")
+        .then().assertThat().statusCode(HttpStatus.CREATED.value());
+  }
+
   public static void makePayment(
       final String fromTenant,
       final String fromTenantApiKey,
@@ -142,7 +193,7 @@ public class StellarBridgeTestHelpers {
       final String assetCode,
       final BigDecimal transferAmount)
   {
-    final String payment1 = getPaymentPayload(
+    final String payment = getPaymentPayload(
         assetCode,
         transferAmount,
         TEST_ADDRESS_DOMAIN,
@@ -153,8 +204,8 @@ public class StellarBridgeTestHelpers {
         .header(TENANT_ID_HEADER_LABEL, fromTenant)
         .header(ENTITY_HEADER_LABEL, ENTITY_HEADER_VALUE)
         .header(ACTION_HEADER_LABEL, ACTION_HEADER_VALUE)
-        .body(payment1)
-        .post("/modules/stellar/bridge/payments")
+        .body(payment)
+        .post("/modules/stellar/bridge/payments/")
         .then().assertThat().statusCode(HttpStatus.CREATED.value());
   }
 
@@ -180,6 +231,10 @@ public class StellarBridgeTestHelpers {
         .get("/modules/stellar/bridge/balances/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(amount));
+  }
+
+  public static void waitForPaymentToComplete() throws InterruptedException {
+    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
   }
 
   public static String tenantVaultStellarAddress(final String tenantId)

@@ -21,8 +21,10 @@ import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.federation.StellarAddress;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.service.HorizonServerUtilities;
+import org.mifos.module.stellar.service.InvalidConfigurationException;
 import org.mifos.module.stellar.service.StellarAddressResolver;
 import org.mifos.module.stellar.repository.AccountBridgeRepositoryDecorator;
+import org.mifos.module.stellar.service.StellarPaymentFailedException;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -50,7 +52,8 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
   }
 
   @Override public void onApplicationEvent(final MifosPaymentEvent event)
-      throws InvalidStellarAddressException, FederationFailedException
+      throws InvalidStellarAddressException, FederationFailedException,
+      InvalidConfigurationException, StellarPaymentFailedException
   {
     final PaymentPersistency paymentPayload = event.getPayload();
     final StellarAccountId targetAccountId;
@@ -68,12 +71,13 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
     final char[] decodedStellarPrivateKey =
         accountBridgeRepositoryDecorator.getStellarAccountPrivateKey(paymentPayload.sourceTenantId);
 
-    horizonServerUtilities.pay(
+    horizonServerUtilities.simplePay(
         targetAccountId,
-        paymentPayload.amount,
-        paymentPayload.assetCode,
+        paymentPayload.amount, paymentPayload.assetCode,
+        accountBridgeRepositoryDecorator.getStellarVaultAccountId(paymentPayload.sourceTenantId),
         decodedStellarPrivateKey);
 
+    //TODO: find appropriate currency for source and target.
     //TODO: adjust mifos balance
     //TODO: Mark event as processed
   }

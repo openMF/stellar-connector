@@ -74,13 +74,11 @@ public class TestCreateTrustLine {
     RestAssured.enableLoggingOfRequestAndResponseIfValidationFails();
 
     firstTenantId = UUID.randomUUID().toString();
-    firstTenantApiKey = createBridge(firstTenantId);
-    testCleanup.addStep(() -> deleteBridge(firstTenantId, firstTenantApiKey));
+    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup);
 
     secondTenantId = UUID.randomUUID().toString();
-    secondTenantApiKey = createBridge(secondTenantId);
-    createVault(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.TEN);
-    testCleanup.addStep(() -> deleteBridge(secondTenantId, secondTenantApiKey));
+    secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup);
+    setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.TEN);
   }
 
   @After
@@ -141,10 +139,8 @@ public class TestCreateTrustLine {
 
     final String secondTenantStellarAddress = tenantVaultStellarAddress(secondTenantId);
 
-    createTrustLine(firstTenantId, firstTenantApiKey,
+    createAndDestroyTrustLine(firstTenantId, firstTenantApiKey,
         secondTenantStellarAddress, ASSET_CODE,
-        BigDecimal.valueOf(1000));
-
-    deleteTrustLine(firstTenantId, firstTenantApiKey, secondTenantStellarAddress, ASSET_CODE);
+        BigDecimal.valueOf(1000), testCleanup);
   }
 }
