@@ -29,4 +29,11 @@ public class StellarTrustLineAdjustmentFailedException extends RuntimeException 
   public static StellarTrustLineAdjustmentFailedException trustLineTransactionFailed() {
     return new StellarTrustLineAdjustmentFailedException("Credit line creation failed.");
   }
+
+  public static StellarTrustLineAdjustmentFailedException selfReferentialVaultTrustline
+      (final String stellarAddress)
+  {
+    return new StellarTrustLineAdjustmentFailedException(
+        "Trustline to accounts vault should be managed via vault: " + stellarAddress);
+  }
 }

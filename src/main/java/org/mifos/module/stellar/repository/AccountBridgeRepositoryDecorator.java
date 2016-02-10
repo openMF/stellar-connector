@@ -51,21 +51,11 @@ public class AccountBridgeRepositoryDecorator {
     return StellarAccountId.mainAccount(accountBridge.getStellarAccountId());
   }
 
-  public char[] getStellarVaultAccountPrivateKey(final String mifosTenantId) {
-    final AccountBridgePersistency accountBridge =
-        this.accountBridgeRepository.findByMifosTenantId(mifosTenantId);
-
-    if (accountBridge == null)
-      return null;
-
-    return accountBridge.getStellarVaultAccountPrivateKey();
-  }
-
   public StellarAccountId getStellarVaultAccountId(final String mifosTenantId) {
     final AccountBridgePersistency accountBridge =
         this.accountBridgeRepository.findByMifosTenantId(mifosTenantId);
 
-    if (accountBridge == null)
+    if (accountBridge == null || accountBridge.getStellarVaultAccountId() == null)
       return null;
 
     return StellarAccountId.mainAccount(accountBridge.getStellarVaultAccountId());

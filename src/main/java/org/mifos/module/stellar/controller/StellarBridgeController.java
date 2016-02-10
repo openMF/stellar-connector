@@ -156,15 +156,20 @@ public class StellarBridgeController {
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @PathVariable("assetCode") final String assetCode,
-      @RequestBody final AmountConfiguration amount)
+      @RequestBody final AmountConfiguration amountConfiguration)
   {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
     //TODO: add security for currency issuing.
+    BigDecimal amount = amountConfiguration.getAmount();
+    if (amount.compareTo(BigDecimal.ZERO) < 0)
+    {
+      return new ResponseEntity<>(amount, HttpStatus.BAD_REQUEST);
+    }
 
     final BigDecimal amountAdjustedTo
-        = stellarBridgeService.adjustVaultIssuedAssets(mifosTenantId, assetCode, amount.getAmount());
+        = stellarBridgeService.adjustVaultIssuedAssets(mifosTenantId, assetCode, amount);
 
-    if (amountAdjustedTo.compareTo(amount.getAmount()) != 0)
+    if (amountAdjustedTo.compareTo(amount) != 0)
       return new ResponseEntity<>(amountAdjustedTo, HttpStatus.CONFLICT);
     else
       return new ResponseEntity<>(amountAdjustedTo, HttpStatus.OK);

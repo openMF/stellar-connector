@@ -4,15 +4,22 @@ import com.jayway.restassured.RestAssured;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.mifos.module.stellar.configuration.MifosStellarBridgeConfiguration;
+import org.mifos.module.stellar.restdomain.AmountConfiguration;
+import org.mifos.module.stellar.restdomain.TrustLineConfiguration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
 import java.util.UUID;
 
+import static com.jayway.restassured.RestAssured.given;
+import static org.mifos.module.stellar.AccountBalanceMatcher.balanceMatches;
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -35,6 +42,73 @@ public class TestVault {
 
   private String tenantId;
   private String tenantApiKey;
+
+  public static void setVaultSizeWrong(
+      final String tenantName,
+      final String apiKey,
+      final String assetCode,
+      final BigDecimal requestedBalance,
+      final BigDecimal finalBalance)
+  {
+    final AmountConfiguration amount = new AmountConfiguration(requestedBalance);
+
+    given()
+        .header(CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
+        .pathParameter("assetCode", assetCode)
+        .body(amount)
+        .put("/modules/stellar/bridge/vault/{assetCode}/")
+        .then().assertThat().statusCode(HttpStatus.CONFLICT.value())
+        .content(balanceMatches(finalBalance));
+  }
+
+  public static void setVaultSizeNegative(
+      final String tenantName,
+      final String apiKey,
+      final String assetCode,
+      final BigDecimal requestedBalance)
+  {
+    final AmountConfiguration amount = new AmountConfiguration(requestedBalance);
+
+    given()
+        .header(CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
+        .pathParameter("assetCode", assetCode)
+        .body(amount)
+        .put("/modules/stellar/bridge/vault/{assetCode}/")
+        .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value())
+        .content(balanceMatches(requestedBalance));
+  }
+
+  public static void checkVaultSize(
+      final String tenantId,
+      final String apiKey,
+      final String assetCode,
+      final BigDecimal balance) {
+    given()
+        .header(CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
+        .pathParameter("assetCode", assetCode)
+        .get("/modules/stellar/bridge/vault/{assetCode}/")
+        .then().assertThat().statusCode(HttpStatus.OK.value())
+        .content(balanceMatches(balance));
+  }
+
+  public static void checkTenantHasNoVault(
+      final String tenantId,
+      final String apiKey,
+      final String assetCode) {
+    given()
+        .header(CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
+        .pathParameter("assetCode", assetCode)
+        .get("/modules/stellar/bridge/vault/{assetCode}/")
+        .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
+  }
 
   @BeforeClass
   public static void setupSystem() throws IOException, InterruptedException {
@@ -97,14 +171,39 @@ public class TestVault {
   }
 
   @Test
-  public void setVaultSizeNegative()
+  public void setVaultSizeBackToZero()
   {
     setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
-    setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.valueOf(-10));
+    setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.ZERO);
 
     checkBalance(tenantId, tenantApiKey, ASSET_CODE,
         tenantVaultStellarAddress(tenantId), BigDecimal.ZERO);
+
     checkVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.ZERO);
+  }
+
+  @Test
+  public void setVaultNegative()
+  {
+    setVaultSizeNegative(tenantId, tenantApiKey, ASSET_CODE,
+        BigDecimal.valueOf(-10));
+
+    checkBalanceDoesntExist(tenantId, tenantApiKey, ASSET_CODE,
+        tenantVaultStellarAddress(tenantId));
+
+    checkTenantHasNoVault(tenantId, tenantApiKey, ASSET_CODE);
+  }
+
+  @Test
+  public void setVaultSizeBackToNegative()
+  {
+    setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
+    setVaultSizeNegative(tenantId, tenantApiKey, ASSET_CODE,
+        BigDecimal.valueOf(-10));
+
+    checkBalance(tenantId, tenantApiKey, ASSET_CODE,
+        tenantVaultStellarAddress(tenantId), BigDecimal.TEN);
+    checkVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
   }
 
 
@@ -133,11 +232,36 @@ public class TestVault {
     checkVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
 
 
-    setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.valueOf(2));
+    setVaultSizeWrong(tenantId, tenantApiKey, ASSET_CODE,
+        BigDecimal.valueOf(2), BigDecimal.valueOf(5));
 
     checkBalance(tenantId, tenantApiKey, ASSET_CODE,
         tenantVaultStellarAddress(tenantId), BigDecimal.ZERO);
 
     checkVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.valueOf(5));
+  }
+
+  @Test
+  public void setTrustlineToTenantsOwnVault()
+  {
+    setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
+
+    final TrustLineConfiguration trustLine = new TrustLineConfiguration(BigDecimal.TEN);
+
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode(tenantVaultStellarAddress(tenantId), "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
+
+    given().header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
+        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, tenantApiKey)
+        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
+        .pathParameter("assetCode", ASSET_CODE)
+        .pathParameter("issuer", issuer)
+        .body(trustLine)
+        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
   }
 }

@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.function.Function;
 
 @Component
 public class HorizonServerUtilities {
@@ -210,7 +211,9 @@ public class HorizonServerUtilities {
 
   public BigDecimal getInstallationAccountBalance(
       final String assetCode,
-      final StellarAccountId issuingStellarAccountId) {
+      final StellarAccountId issuingStellarAccountId)
+      throws InvalidConfigurationException
+  {
     final StellarAccountId installationAccountId = StellarAccountId.mainAccount(
         KeyPair.fromSecretSeed(installationAccountPrivateKey).getAccountId());
     return this.getBalanceByIssuer(installationAccountId, assetCode, issuingStellarAccountId);
@@ -220,6 +223,7 @@ public class HorizonServerUtilities {
       final StellarAccountId stellarAccountId,
       final String assetCode,
       final StellarAccountId accountIdOfIssuingStellarAddress)
+      throws InvalidConfigurationException
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
 
@@ -250,7 +254,8 @@ public class HorizonServerUtilities {
     final Account trustingAccount = getAccount(server, trustingAccountKeyPair);
     final Asset asset = getAsset(assetCode, issuingAccountId);
 
-    return getBalanceOfAsset(trustingAccount, asset);
+    return getNumericAspectOfAsset(trustingAccount, asset,
+        balance -> stellarBalanceToBigDecimal(balance.getLimit()));
   }
 
   private void createAccountForKeyPair(
@@ -352,10 +357,19 @@ public class HorizonServerUtilities {
       final Account sourceAccount,
       final Asset asset)
   {
+    return getNumericAspectOfAsset(sourceAccount, asset,
+        balance -> stellarBalanceToBigDecimal(balance.getBalance()));
+  }
+
+  private BigDecimal getNumericAspectOfAsset(
+      final Account sourceAccount,
+      final Asset asset,
+      final Function<Account.Balance, BigDecimal> aspect)
+  {
     final Optional<BigDecimal> balanceOfGivenAsset
         = Arrays.asList(sourceAccount.getBalances()).stream()
         .filter(balance -> getAssetOfBalance(balance).equals(asset))
-        .map(balance -> stellarBalanceToBigDecimal(balance.getBalance()))
+        .map(aspect)
         .max(BigDecimal::compareTo);
 
     //Theoretically there shouldn't be more than one balance, but if this should turn out to be

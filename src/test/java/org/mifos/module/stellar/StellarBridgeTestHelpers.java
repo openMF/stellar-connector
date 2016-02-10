@@ -77,7 +77,6 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
-
   public static void setVaultSize(
       final String tenantName,
       final String apiKey,
@@ -93,20 +92,6 @@ public class StellarBridgeTestHelpers {
         .pathParameter("assetCode", assetCode)
         .body(amount)
         .put("/modules/stellar/bridge/vault/{assetCode}/")
-        .then().assertThat().statusCode(HttpStatus.OK.value());
-  }
-
-  public static void checkVaultSize(
-      final String tenantId,
-      final String apiKey,
-      final String assetCode,
-      final BigDecimal balance) {
-    given()
-        .header(CONTENT_TYPE_HEADER)
-        .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
-        .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
-        .pathParameter("assetCode", assetCode)
-        .get("/modules/stellar/bridge/vault/{assetCode}/")
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(balance));
   }
@@ -232,6 +217,29 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(amount));
   }
+
+  public static void checkBalanceDoesntExist(
+      final String tenant,
+      final String tenantApiKey,
+      final String assetCode,
+      final String issuingStellarAddress)
+  {
+    String issuer = "";
+    try {
+      issuer = URLEncoder.encode(issuingStellarAddress, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      Assert.fail();
+    }
+
+    given().header(CONTENT_TYPE_HEADER)
+        .header(API_KEY_HEADER_LABEL, tenantApiKey)
+        .header(TENANT_ID_HEADER_LABEL, tenant)
+        .pathParam("assetCode", assetCode)
+        .pathParam("issuer", issuer)
+        .get("/modules/stellar/bridge/balances/{assetCode}/{issuer}/")
+        .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
+  }
+
 
   public static void waitForPaymentToComplete() throws InterruptedException {
     Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.

@@ -1,5 +1,6 @@
 package org.mifos.module.stellar.federation;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public class StellarAccountId {
@@ -30,5 +31,18 @@ public class StellarAccountId {
 
   public Optional<String> getSubAccount() {
     return subAccount;
+  }
+
+  @Override public boolean equals(Object o) {
+    if (this == o)
+      return true;
+    if (o == null || getClass() != o.getClass())
+      return false;
+    StellarAccountId that = (StellarAccountId) o;
+    return Objects.equals(publicKey, that.publicKey) && Objects.equals(subAccount, that.subAccount);
+  }
+
+  @Override public int hashCode() {
+    return Objects.hash(publicKey, subAccount);
   }
 }
