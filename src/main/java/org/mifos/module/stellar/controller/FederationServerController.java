@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.stellar.sdk.federation.FederationResponse;
 
 @RestController
 public class FederationServerController {
@@ -32,7 +33,7 @@ public class FederationServerController {
     this.federationService = federationService;
   }
 
-  @RequestMapping(value = "/federation", method = RequestMethod.GET,
+  @RequestMapping(value = "/federation/", method = RequestMethod.GET,
       produces = {"application/json"})
   public ResponseEntity<FederationResponse> getId(
       @RequestParam("type") final String type,
@@ -40,7 +41,7 @@ public class FederationServerController {
 
     if (!type.equalsIgnoreCase("name"))
     {
-      return new ResponseEntity<>(FederationResponse.invalidType(type), HttpStatus.NOT_IMPLEMENTED);
+      return new ResponseEntity<>(FederationResponseBuilder.invalidType(type), HttpStatus.NOT_IMPLEMENTED);
     }
 
     final StellarAddress stellarAddress = StellarAddress.parse(nameToLookUp);
@@ -50,13 +51,13 @@ public class FederationServerController {
 
     final FederationResponse ret;
     if (accountId.getSubAccount().isPresent()) {
-      ret = FederationResponse
+      ret = FederationResponseBuilder
           .accountInMemoField(stellarAddress.toString(), accountId.getPublicKey(),
               accountId.getSubAccount().get());
     }
     else
     {
-      ret = FederationResponse.account(stellarAddress.toString(), accountId.getPublicKey());
+      ret = FederationResponseBuilder.account(stellarAddress.toString(), accountId.getPublicKey());
     }
 
     return new ResponseEntity<>(ret, HttpStatus.OK);

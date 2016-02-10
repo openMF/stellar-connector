@@ -15,25 +15,13 @@
  */
 package org.mifos.module.stellar.federation;
 
-import com.google.gson.annotations.SerializedName;
+import org.stellar.sdk.federation.FederationResponse;
 
 /**
  * Federation response as documented in
  * https://www.stellar.org/developers/learn/concepts/federation.html
  */
-public class FederationResponse {
-  @SerializedName("stellar_address")
-  private String stellarAddress; // <username*domain.tld>,
-
-  @SerializedName("account_id")
-  private String accountId; // <account_id>,
-
-  @SerializedName("memo_type")
-  private String memoType; // <"text", "id" , or "hash"> *optional*
-
-  @SerializedName("memo")
-  private String memo; //<memo to attach to any payment. if "hash" type then will be base32 encoded> *optional*
-
+public class FederationResponseBuilder {
 
   public static FederationResponse invalidType(final String type) {
     return new FederationResponse(null, null, null, "queried type is invalid: " + type);
@@ -52,32 +40,5 @@ public class FederationResponse {
       final String accountId)
   {
     return new FederationResponse(stellarAddress, accountId, "", "");
-  }
-
-  FederationResponse(
-      final String stellarAddress,
-      final String accountId,
-      final String memoType,
-      final String memo)
-  {
-    this.stellarAddress = stellarAddress;
-    this.accountId = accountId;
-    this.memoType = memoType;
-    this.memo = memo;
-  }
-
-  @SuppressWarnings("unused")
-  public String getStellarAddress() { return stellarAddress; }
-
-  public String getAccountId() {
-    return accountId;
-  }
-
-  public String getMemoType() {
-    return memoType;
-  }
-
-  public String getMemo() {
-    return memo;
   }
 }

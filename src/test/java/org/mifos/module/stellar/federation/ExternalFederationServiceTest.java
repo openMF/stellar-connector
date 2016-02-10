@@ -15,19 +15,14 @@
  */
 package org.mifos.module.stellar.federation;
 
-import com.moandjiezana.toml.Toml;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
@@ -38,15 +33,12 @@ import static org.junit.Assert.assertFalse;
 @RunWith(Parameterized.class)
 public class ExternalFederationServiceTest {
   private static class TestCase {
-    private StellarAddress inputtedStellarAddress = null;
+    private String inputtedStellarAddress = null;
 
-    private URL addressDomainUrl = null;
     public boolean addressDomainAccessFails = false;
-    private String federationServerApi = null;
 
     private String outputtedMemoType = "";
     private String outputtedMemo = "";
-    private HttpStatus outputtedStatus = HttpStatus.OK;
 
     private String expectedPublicKey = null;
     private Optional<String> expectedSubAccount = Optional.empty();
@@ -55,26 +47,12 @@ public class ExternalFederationServiceTest {
 
     TestCase inputtedStellarAddress(final String value)
     {
-      this.inputtedStellarAddress = StellarAddress.parse(value);
-      return this;
-    }
-
-    TestCase addressDomainUrl(final String value) {
-      try {
-        this.addressDomainUrl = new URL(value);
-      } catch (MalformedURLException e) {
-        assertFalse("This exception should never occur here.", true);
-      }
+      this.inputtedStellarAddress = value;
       return this;
     }
 
     TestCase addressDomainAccessFails(final boolean value) {
       this.addressDomainAccessFails = value;
-      return this;
-    }
-
-    TestCase federationServerApi(final String value) {
-      this.federationServerApi = value;
       return this;
     }
 
@@ -87,12 +65,6 @@ public class ExternalFederationServiceTest {
     TestCase outputtedMemo(final String value)
     {
       this.outputtedMemo = value;
-      return this;
-    }
-
-    TestCase outputtedStatus(final HttpStatus value)
-    {
-      this.outputtedStatus = value;
       return this;
     }
 
@@ -127,15 +99,11 @@ public class ExternalFederationServiceTest {
     final Collection<TestCase> ret = new ArrayList<>();
     ret.add(new TestCase()
         .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
-        .federationServerApi("https://api.x.org/federation")
         .expectedPublicKey("G12351354")
     );
 
     ret.add(new TestCase()
         .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
-        .federationServerApi("https://api.x.org/federation")
         .expectedPublicKey("G12351354")
         .outputtedMemoType("text")
         .outputtedMemo("xyz")
@@ -144,8 +112,6 @@ public class ExternalFederationServiceTest {
 
     ret.add(new TestCase()
         .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
-        .federationServerApi("https://api.x.org/federation")
         .expectedPublicKey("G12351354")
         .outputtedMemoType("hash") //Only text type is currently supported.
         .exceptionExpected(true)
@@ -153,8 +119,6 @@ public class ExternalFederationServiceTest {
 
     ret.add(new TestCase()
         .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
-        .federationServerApi("https://api.x.org/federation")
         .expectedPublicKey("G12351354")
         .outputtedMemoType("id") //Only text type is currently supported.
         .exceptionExpected(true)
@@ -162,23 +126,7 @@ public class ExternalFederationServiceTest {
 
     ret.add(new TestCase()
         .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
-        .federationServerApi("https://api.x.org/federation")
-        .outputtedStatus(HttpStatus.NOT_FOUND) //Can happen if the federation server is not running.
-        .exceptionExpected(true)
-    );
-
-    ret.add(new TestCase()
-        .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
         .addressDomainAccessFails(true) //Can happen if there's nothing at that URL (for example).
-        .exceptionExpected(true)
-    );
-
-    ret.add(new TestCase()
-        .inputtedStellarAddress("x*x.org")
-        .addressDomainUrl("https://x.org/.well-known/stellar.toml")
-        .federationServerApi(null) //Can happen if the necessary TOML property is not present.
         .exceptionExpected(true)
     );
 
@@ -190,14 +138,14 @@ public class ExternalFederationServiceTest {
     checkTestCaseConsistency();
     //(Not strictly necessary, but helpful for avoiding test case programming errors.)
 
-    final ExternalFederationService.MockableExternalCalls externalCallsMock =
+    final ExternalFederationService.StellarResolver externalCallsMock =
         getExternalCallsMock();
 
     try {
       final ExternalFederationService testSubject =
           new ExternalFederationService(externalCallsMock);
       final StellarAccountId stellarAccountId =
-          testSubject.getAccountId(testCase.inputtedStellarAddress);
+          testSubject.getAccountId(StellarAddress.parse(testCase.inputtedStellarAddress));
       assertEquals(testCase.exceptionExpected, false);
 
       assertEquals(testCase.expectedPublicKey, stellarAccountId.getPublicKey());
@@ -212,61 +160,35 @@ public class ExternalFederationServiceTest {
   private void checkTestCaseConsistency() {
     final String INCOMPLETE = "Testcase initialization incomplete";
     assertFalse(INCOMPLETE, testCase.inputtedStellarAddress == null);
-    assertFalse(INCOMPLETE, testCase.addressDomainUrl == null);
     if (!testCase.addressDomainAccessFails && !testCase.exceptionExpected) {
-      assertFalse(INCOMPLETE, testCase.federationServerApi == null);
       assertFalse(INCOMPLETE, testCase.expectedPublicKey == null);
     }
   }
 
-  private ExternalFederationService.MockableExternalCalls getExternalCallsMock() {
+  private ExternalFederationService.StellarResolver getExternalCallsMock() {
     final Mockery context = new Mockery();
     context.setImposteriser(ClassImposteriser.INSTANCE);
 
 
-    final ExternalFederationService.MockableExternalCalls externalCallsMock =
-        context.mock(ExternalFederationService.MockableExternalCalls.class);
-    final ExternalFederationService.FederationService federationServiceMock =
-        context.mock(ExternalFederationService.FederationService.class);
-    final InputStream tomlStreamMock = context.mock(InputStream.class);
-    final Toml tomlParserMock = context.mock(Toml.class);
+    final ExternalFederationService.StellarResolver externalCallsMock =
+        context.mock(ExternalFederationService.StellarResolver.class);
 
     context.checking( new Expectations() {{
 
       try {
-        allowing(externalCallsMock).getStreamFromUrl(testCase.addressDomainUrl);
+        allowing(externalCallsMock).resolve(testCase.inputtedStellarAddress);
       } catch (IOException e1) {
         assertFalse("An IOException should never be thrown here in the test.", true);
       }
       if (!testCase.addressDomainAccessFails) {
-        will(returnValue(tomlStreamMock));
+        will(returnValue(
+            new org.stellar.sdk.federation.FederationResponse(
+                testCase.inputtedStellarAddress, testCase.expectedPublicKey,
+                testCase.outputtedMemoType, testCase.outputtedMemo)));
       }
       else {
         will(throwException(new IOException()));
       }
-
-      allowing(externalCallsMock).getTomlParser(tomlStreamMock);
-      will(returnValue(tomlParserMock));
-
-      allowing(tomlParserMock).getString("FEDERATION_SERVER");
-      will(returnValue(testCase.federationServerApi));
-
-      allowing(externalCallsMock).getExternalFederationService(testCase.federationServerApi);
-      will(returnValue(federationServiceMock));
-
-      allowing(federationServiceMock).getAccountIdFromAddress(
-          "name", testCase.inputtedStellarAddress.toString());
-      if (testCase.outputtedStatus == HttpStatus.OK) {
-        will(returnValue(
-            new FederationResponse(
-                testCase.inputtedStellarAddress.toString(), testCase.expectedPublicKey,
-                testCase.outputtedMemoType, testCase.outputtedMemo)));
-      }
-      else {
-        will(throwException(new ExternalFederationService.FederationApiGetFailed(
-            testCase.outputtedStatus)));
-      }
-
     }});
     return externalCallsMock;
   }
