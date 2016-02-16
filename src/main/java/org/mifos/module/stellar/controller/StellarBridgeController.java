@@ -151,7 +151,7 @@ public class StellarBridgeController {
 
   @RequestMapping(value = "/stellar/bridge/vault/{assetCode}",
       method = RequestMethod.PUT,
-      consumes = {"application/json", "text/plain;charset=ISO-8859-1"}, produces = {"application/json"})
+      consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<BigDecimal> adjustVaultIssuedAssets(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
@@ -198,7 +198,7 @@ public class StellarBridgeController {
       value = "/stellar/bridge/balances/{assetCode}",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<String> getStellarAccountBalance(
+  public ResponseEntity<BigDecimal> getStellarAccountBalance(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @PathVariable("assetCode") final String assetCode)
@@ -206,7 +206,7 @@ public class StellarBridgeController {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     return new ResponseEntity<>(
-        stellarBridgeService.getBalance(mifosTenantId, assetCode).toString(),
+        stellarBridgeService.getBalance(mifosTenantId, assetCode),
         HttpStatus.OK);
   }
 
@@ -214,13 +214,12 @@ public class StellarBridgeController {
       value = "/stellar/bridge/balances/{assetCode}/{issuer}/",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<String> getStellarAccountBalanceByIssuer(
+  public ResponseEntity<BigDecimal> getStellarAccountBalanceByIssuer(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
       @PathVariable("assetCode") final String assetCode,
       @PathVariable("issuer") final String urlEncodedIssuingStellarAddress)
   {
-    //TODO can I return a BigDecimal via a rest interface?  If so it would be better here.
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
 
     final String issuingStellarAddress;
@@ -233,7 +232,7 @@ public class StellarBridgeController {
     return new ResponseEntity<>(
         stellarBridgeService.getBalanceByIssuer(
             mifosTenantId, assetCode,
-            StellarAddress.parse(issuingStellarAddress)).toString(),
+            StellarAddress.parse(issuingStellarAddress)),
         HttpStatus.OK);
   }
 
@@ -241,16 +240,15 @@ public class StellarBridgeController {
       value = "/stellar/installationaccount/balances/{assetCode}/{issuer}/",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<String> getInstallationAccountBalance(
+  public ResponseEntity<BigDecimal> getInstallationAccountBalance(
       @PathVariable("assetCode") final String assetCode,
       @PathVariable("issuer") final String issuingStellarAddress)
   {
-    //TODO can I return a BigDecimal via a rest interface?  If so it would be better here.
     return new ResponseEntity<>(
         stellarBridgeService.getInstallationAccountBalance(
             assetCode,
             StellarAddress.parse(issuingStellarAddress)
-        ).toString(),
+        ),
         HttpStatus.OK);
 
   }
