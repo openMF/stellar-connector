@@ -45,9 +45,13 @@ public class TestPaymentViaMarketMaker {
   public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
   public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
   public static final BigDecimal MARKET_SIZE = BigDecimal.valueOf(100);
+  public static final int MAX_PAY_WAIT = 5000;
 
   @Value("${local.server.port}")
   int bridgePort;
+
+  @Value("${stellar.horizon-address}")
+  String serverAddress;
 
   private Cleanup testCleanup = new Cleanup();
   private final static Cleanup suiteCleanup = new Cleanup();
@@ -124,13 +128,16 @@ public class TestPaymentViaMarketMaker {
   }
 
   //@Test
-  public void paymentAtMarketCapacity() throws InterruptedException
+  public void paymentAtMarketCapacity() throws Exception
   {
+    final AccountListener accountListener = new AccountListener(serverAddress, secondTenantId);
+
     makePayment(firstTenantId, firstTenantApiKey,
         secondTenantId,
         ASSET_CODE, MARKET_SIZE);
 
-    waitForPaymentToComplete();
+    accountListener.waitForCredits(MAX_PAY_WAIT,
+        AccountListener.credit(secondTenantId, MARKET_SIZE, ASSET_CODE, firstTenantId));
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
@@ -143,13 +150,16 @@ public class TestPaymentViaMarketMaker {
 
 
   //@Test
-  public void paymentAboveMarketCapacity() throws InterruptedException
+  public void paymentAboveMarketCapacity() throws Exception
   {
+    final AccountListener accountListener = new AccountListener(serverAddress, secondTenantId);
+
     makePayment(firstTenantId, firstTenantApiKey,
         secondTenantId,
         ASSET_CODE, MARKET_SIZE.add(BigDecimal.ONE));
 
-    waitForPaymentToComplete();
+    accountListener.waitForCredits(MAX_PAY_WAIT,
+        AccountListener.credit(secondTenantId, MARKET_SIZE, ASSET_CODE, firstTenantId));
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),

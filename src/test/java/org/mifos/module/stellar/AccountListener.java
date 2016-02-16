@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.getStellarAccountIdForTenantId;
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.getStellarVaultAccountIdForTenantId;
 
-public class PaymentListener {
+public class AccountListener {
   static class Credit
   {
     private final String toTenantId;
@@ -118,7 +118,7 @@ public class PaymentListener {
   final Map<String, String> stellarIdToTenantId = new HashMap<>();
   final Map<String, String> stellarVaultIdToTenantId = new HashMap<>();
 
-  PaymentListener(final String serverAddress, final String... tenantIds)
+  AccountListener(final String serverAddress, final String... tenantIds)
   {
     Arrays.asList(tenantIds).stream()
         .filter(tenantId -> tenantId != null)
@@ -151,24 +151,33 @@ public class PaymentListener {
     effectsRequestBuilder.stream(listener);
   }
 
-  public List<Credit> waitForCreditsToArrive(final long maxWait, final Credit... creditsExpected)
-      throws InterruptedException {
-    final List<Credit> incompleteCredits = new LinkedList<>(Arrays.asList(creditsExpected));
+  public List<Credit> waitForCredits(final long maxWait, final Credit... creditsExpected)
+      throws Exception {
+    return waitForCredits(maxWait, Arrays.asList(creditsExpected));
+  }
+
+  public List<Credit> waitForCredits(final long maxWait, final List<Credit> creditsExpected)
+      throws Exception {
+    final List<Credit> incompleteCredits = new LinkedList<>(creditsExpected);
 
     final long startTime = new Date().getTime();
 
-    while (!incompleteCredits.isEmpty()) {
-      final Credit credit = credits.poll(maxWait/incompleteCredits.size(), TimeUnit.MILLISECONDS);
-      if (credit != null) {
-        incompleteCredits.remove(credit);
+    try (final Cleanup cleanup = new Cleanup()) {
+      while (!incompleteCredits.isEmpty()) {
+        final Credit credit = credits.poll(maxWait / incompleteCredits.size(), TimeUnit.MILLISECONDS);
+        if (credit != null) {
+          final boolean matched = incompleteCredits.remove(credit);
+          if (!matched)
+            cleanup.addStep(() -> credits.put(credit));
+        }
+
+        final long now = new Date().getTime();
+
+        if (((now - startTime) > maxWait) && credits.isEmpty())
+          return incompleteCredits;
       }
 
-      final long now = new Date().getTime();
-
-      if (((now - startTime) > maxWait) && credits.isEmpty())
-        return incompleteCredits;
+      return incompleteCredits;
     }
-
-    return incompleteCredits;
   }
 }

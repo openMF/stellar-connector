@@ -33,9 +33,13 @@ import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
 })
 public class TestVault {
   public static final String ASSET_CODE = "XXX";
+  public static final int MAX_PAY_WAIT = 5000;
 
   @Value("${local.server.port}")
   int bridgePort;
+
+  @Value("${stellar.horizon-address}")
+  String serverAddress;
 
   private Cleanup testCleanup = new Cleanup();
   private final static Cleanup suiteCleanup = new Cleanup();
@@ -208,7 +212,7 @@ public class TestVault {
 
 
   @Test
-  public void setVaultSizeBelowPossible() throws InterruptedException {
+  public void setVaultSizeBelowPossible() throws Exception {
     setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
 
     final String secondTenantId = UUID.randomUUID().toString();
@@ -220,9 +224,12 @@ public class TestVault {
         ASSET_CODE, BigDecimal.TEN,
         testCleanup);
 
-    makePayment(tenantId, tenantApiKey, secondTenantId, ASSET_CODE, BigDecimal.valueOf(5));
+    final AccountListener accountListener = new AccountListener(serverAddress, secondTenantId);
+    final BigDecimal transferAmount = BigDecimal.valueOf(5);
+    makePayment(tenantId, tenantApiKey, secondTenantId, ASSET_CODE, transferAmount);
 
-    waitForPaymentToComplete();
+    accountListener.waitForCredits(MAX_PAY_WAIT,
+        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, tenantId));
 
     checkBalance(tenantId, tenantApiKey, ASSET_CODE,
         tenantVaultStellarAddress(tenantId), BigDecimal.valueOf(5));

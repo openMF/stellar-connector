@@ -243,11 +243,6 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
   }
 
-
-  public static void waitForPaymentToComplete() throws InterruptedException {
-    Thread.sleep(5000); //TODO: find a better way to determine when the payment is complete.
-  }
-
   public static String tenantVaultStellarAddress(final String tenantId)
   {
     return tenantId + ":vault" + "*" + TEST_ADDRESS_DOMAIN;

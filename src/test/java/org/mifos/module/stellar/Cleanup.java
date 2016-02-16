@@ -18,7 +18,11 @@ package org.mifos.module.stellar;
 import java.util.LinkedList;
 import java.util.List;
 
-public class Cleanup {
+public class Cleanup implements AutoCloseable {
+  @Override public void close() throws Exception {
+    cleanup();
+  }
+
   public interface Step {
     void clean() throws Exception;
   }
