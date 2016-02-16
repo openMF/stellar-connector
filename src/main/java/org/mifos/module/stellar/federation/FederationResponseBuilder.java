@@ -22,11 +22,6 @@ import org.stellar.sdk.federation.FederationResponse;
  * https://www.stellar.org/developers/learn/concepts/federation.html
  */
 public class FederationResponseBuilder {
-
-  public static FederationResponse invalidType(final String type) {
-    return new FederationResponse(null, null, null, "queried type is invalid: " + type);
-  }
-
   public static FederationResponse accountInMemoField(
       final String stellarAddress,
       final String accountId,
