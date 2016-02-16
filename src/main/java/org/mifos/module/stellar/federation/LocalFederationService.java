@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.stellar.base.KeyPair;
 
 @Service
 public class LocalFederationService {
@@ -76,23 +77,40 @@ public class LocalFederationService {
 
     if (stellarAddress.isVaultAddress())
     {
-      if (accountBridge.getStellarVaultAccountId() == null)
-        throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
-      else
-        return StellarAccountId.mainAccount(accountBridge.getStellarVaultAccountId());
+      final String vaultAccountId = accountBridge.getStellarVaultAccountId();
+
+      privateKeyIntegrityCheck(vaultAccountId, accountBridge.getStellarVaultAccountPrivateKey(),
+          stellarAddress);
+
+      return StellarAccountId.mainAccount(vaultAccountId);
     }
     else {
       final String accountId = accountBridge.getStellarAccountId();
 
+      privateKeyIntegrityCheck(accountId, accountBridge.getStellarAccountPrivateKey(),
+          stellarAddress);
+
       if (!userAccountId.isPresent()) {
         return StellarAccountId.mainAccount(accountId);
       } else {
-        //TODO: check that an account under this account id actually exists.
+        //TODO: check that an account under this user account id actually exists.
         return StellarAccountId.subAccount(accountId, userAccountId.get());
       }
+    }
+  }
 
-      //TODO: check here that the public and private keys match. Broken data integrity would mean
-      //TODO: the user would have no access to his or her funds if they don't match.
+  private void privateKeyIntegrityCheck(
+      final String accountId,
+      final char[] stellarAccountPrivateKey,
+      final StellarAddress stellarAddress) {
+    if (accountId == null || stellarAccountPrivateKey == null)
+      throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
+
+    final KeyPair keyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
+    final boolean accountHasIntegrity = keyPair.getAccountId().equals(accountId);
+
+    if (!accountHasIntegrity) {
+      throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
     }
   }
 }
