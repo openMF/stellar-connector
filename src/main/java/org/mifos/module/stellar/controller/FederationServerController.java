@@ -70,16 +70,16 @@ public class FederationServerController {
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public void handleInvalidNameFormatException(
+  public String handleInvalidNameFormatException(
       @SuppressWarnings("unused") final InvalidStellarAddressException ex) {
-    //TODO: Improve error output.
+    return ex.getMessage();
   }
 
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public void handleFederationFailedException(
+  public String handleFederationFailedException(
       @SuppressWarnings("unused") final FederationFailedException ex) {
-    //TODO: Improve error output.
+    return ex.getMessage();
   }
 }
