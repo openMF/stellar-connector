@@ -39,4 +39,8 @@ public class FederationFailedException extends RuntimeException {
   public static FederationFailedException addressNameNotFound(final String address) {
     return new FederationFailedException("The address name is not found: " + address);
   }
+
+  public static FederationFailedException malformedAddress(final String address) {
+    return new FederationFailedException("The address is not a valid stellar address: " + address);
+  }
 }

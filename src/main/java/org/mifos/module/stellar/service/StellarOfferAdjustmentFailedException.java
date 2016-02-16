@@ -13,17 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.repository;
+package org.mifos.module.stellar.service;
 
+public class StellarOfferAdjustmentFailedException extends RuntimeException {
 
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.stereotype.Repository;
-import org.stellar.base.KeyPair;
-
-@Repository
-public interface AccountBridgeRepository
-    extends CrudRepository<AccountBridgePersistency, Long> {
-  AccountBridgePersistency findByMifosTenantId(final String mifosTenantId);
-  AccountBridgePersistency findByStellarAccountId(final String stellarAccountId);
 }

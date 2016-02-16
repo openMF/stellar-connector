@@ -33,12 +33,13 @@ import java.util.Date;
 
 @Service
 public class StellarBridgeService implements ApplicationEventPublisherAware {
-  private final StellarAddressResolver stellarAddressResolver;
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
   private ApplicationEventPublisher eventPublisher;
   private final MifosEventRepository mifosEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final Gson gson;
+  private final StellarAddressResolver stellarAddressResolver;
+  private final HorizonServerPaymentObserver horizonServerPaymentObserver;
 
   @Autowired
   public StellarBridgeService(
@@ -46,12 +47,14 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
       final HorizonServerUtilities horizonServerUtilities,
       final Gson gson,
-      final StellarAddressResolver stellarAddressResolver) {
+      final StellarAddressResolver stellarAddressResolver,
+      final HorizonServerPaymentObserver horizonServerPaymentObserver) {
     this.mifosEventRepository = mifosEventRepository;
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.horizonServerUtilities = horizonServerUtilities;
     this.gson = gson;
     this.stellarAddressResolver = stellarAddressResolver;
+    this.horizonServerPaymentObserver = horizonServerPaymentObserver;
   }
 
   @Override
@@ -75,6 +78,9 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final KeyPair accountKeyPair = horizonServerUtilities.createAccount();
+
+    horizonServerPaymentObserver.setupListeningForAccount(
+        StellarAccountId.mainAccount(accountKeyPair.getAccountId()));
 
     this.accountBridgeRepositoryDecorator.save(
         mifosTenantId, mifosToken, accountKeyPair);

@@ -35,6 +35,16 @@ import java.util.function.Function;
 
 @Component
 public class HorizonServerUtilities {
+  static String getAssetCode(final Asset asset) {
+    if (asset instanceof AssetTypeCreditAlphaNum)
+    {
+      return ((AssetTypeCreditAlphaNum)asset).getCode();
+    }
+    else
+    {
+      return "XLM";
+    }
+  }
 
   private final Logger logger;
 
@@ -206,7 +216,8 @@ public class HorizonServerUtilities {
       final String assetCode)
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
-    return getBalance(accountKeyPair, assetCode);
+    final Account tenantAccount = getAccount(server, accountKeyPair);
+    return getBalance(tenantAccount, assetCode);
   }
 
   public BigDecimal getInstallationAccountBalance(
@@ -234,8 +245,7 @@ public class HorizonServerUtilities {
     return getBalanceOfAsset(account, asset);
   }
 
-  private BigDecimal getBalance(final KeyPair accountKeyPair, final String assetCode) {
-    final Account tenantAccount = getAccount(server, accountKeyPair);
+  private BigDecimal getBalance(final Account tenantAccount, final String assetCode) {
     final Account.Balance[] balances = tenantAccount.getBalances();
 
     return Arrays.asList(balances).stream()
@@ -257,6 +267,54 @@ public class HorizonServerUtilities {
     return getNumericAspectOfAsset(trustingAccount, asset,
         balance -> stellarBalanceToBigDecimal(balance.getLimit()));
   }
+
+  public void adjustOffer(
+      final char[] stellarAccountPrivateKey,
+      final StellarAccountId vaultAccountId,
+      final Asset asset) {
+    if (!(asset instanceof AssetTypeCreditAlphaNum))
+      return;
+
+    final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
+
+    final Account account = getAccount(server, accountKeyPair);
+
+    final String assetCode = getAssetCode(asset);
+    final Asset vaultAsset = getAsset(assetCode, vaultAccountId);
+
+    final BigDecimal balanceOfVaultAsset = getBalanceOfAsset(account, vaultAsset);
+
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(account);
+    Arrays.asList(account.getBalances()).stream()
+        .filter(balance -> balanceIsInAsset(balance, assetCode))
+        .filter(balance -> !getAssetOfBalance(balance).equals(vaultAsset))
+        .map(balance -> offerOperation(
+                accountKeyPair,
+                getAssetOfBalance(balance),
+                vaultAsset,
+                balanceOfVaultAsset.min(stellarBalanceToBigDecimal(balance.getBalance()))))
+        .forEachOrdered(transactionBuilder::addOperation);
+
+    final Transaction transaction = transactionBuilder.build();
+    transaction.sign(accountKeyPair);
+
+    submitTransaction(transaction, StellarOfferAdjustmentFailedException::new);
+  }
+
+  private ManageOfferOperation offerOperation(
+      final KeyPair sourceAccountKeyPair,
+      final Asset fromAsset,
+      final Asset toAsset,
+      final BigDecimal amount)
+  {
+    final ManageOfferOperation.Builder offerOperationBuilder
+        = new ManageOfferOperation.Builder(
+        fromAsset, toAsset, bigDecimalToStellarBalance(amount), "1");
+    offerOperationBuilder.setSourceAccount(sourceAccountKeyPair);
+    return offerOperationBuilder.build();
+  }
+
+
 
   private void createAccountForKeyPair(
       final KeyPair newAccountKeyPair,
@@ -331,7 +389,6 @@ public class HorizonServerUtilities {
     return installationAccount;
   }
 
-
   private interface TransactionFailedException<T extends Exception> {
     T exceptionWhenTransactionFails();
   }
@@ -341,10 +398,11 @@ public class HorizonServerUtilities {
       final TransactionFailedException<T> failureHandler) throws T
   {
     try {
-      final SubmitTransactionResponse createTrustLineResponse =
+      final SubmitTransactionResponse transactionResponse =
           server.submitTransaction(transaction);
-      if (!createTrustLineResponse.isSuccess())
+      if (!transactionResponse.isSuccess())
       {
+        //TODO: resend transaction if you get a bad sequence.
         throw failureHandler.exceptionWhenTransactionFails();
       }
       //TODO: find a way to communicate back fees

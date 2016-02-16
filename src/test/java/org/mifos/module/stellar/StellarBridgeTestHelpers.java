@@ -22,10 +22,13 @@ import com.jayway.restassured.response.Response;
 import org.junit.Assert;
 import org.mifos.module.stellar.restdomain.*;
 import org.springframework.http.HttpStatus;
+import org.stellar.sdk.federation.FederationResponse;
 
+import javax.validation.constraints.NotNull;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
+import java.util.Optional;
 
 import static com.jayway.restassured.RestAssured.given;
 import static org.mifos.module.stellar.AccountBalanceMatcher.balanceMatches;
@@ -249,6 +252,41 @@ public class StellarBridgeTestHelpers {
   {
     return tenantId + ":vault" + "*" + TEST_ADDRESS_DOMAIN;
   }
+
+  public static String tenantStellarAddress(final String tenantId) {
+
+    return tenantId + "*" + TEST_ADDRESS_DOMAIN;
+  }
+
+  public static Optional<String> getStellarAccountIdForTenantId(@NotNull final String tenantId) {
+
+    final String tenantStellarAddress = tenantStellarAddress(tenantId);
+
+    return getStellarAccountIdForStellarAddress(tenantStellarAddress);
+  }
+
+  public static Optional<String> getStellarVaultAccountIdForTenantId(@NotNull final String tenantId) {
+    final String tenantVaultStellarAddress = tenantVaultStellarAddress(tenantId);
+
+    return getStellarAccountIdForStellarAddress(tenantVaultStellarAddress);
+  }
+
+  public static Optional<String> getStellarAccountIdForStellarAddress
+      (@NotNull final String tenantStellarAddress) {
+    final Response restResponse = given()
+        .queryParam("type", "name").queryParam("q", tenantStellarAddress).get("/federation/");
+
+    restResponse.then().assertThat().statusCode(HttpStatus.OK.value());
+
+    final FederationResponse response
+        = restResponse.getBody().as(FederationResponse.class, ObjectMapperType.GSON);
+
+    if (response == null)
+      return Optional.empty();
+
+    return Optional.of(response.getAccountId());
+  }
+
 
   static String getPaymentPayload(
       final String assetCode,

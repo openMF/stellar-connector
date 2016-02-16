@@ -15,6 +15,7 @@
  */
 package org.mifos.module.stellar.controller;
 
+import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -25,23 +26,26 @@ import org.stellar.sdk.federation.FederationResponse;
 @RestController
 public class FederationServerController {
   private final LocalFederationService federationService;
+  private final Gson gson;
 
   @Autowired
   public FederationServerController(
-      final LocalFederationService federationService)
+      final LocalFederationService federationService,
+      final Gson gson)
   {
     this.federationService = federationService;
+    this.gson = gson;
   }
 
   @RequestMapping(value = "/federation/", method = RequestMethod.GET,
       produces = {"application/json"})
-  public ResponseEntity<FederationResponse> getId(
+  public ResponseEntity<String> getId(
       @RequestParam("type") final String type,
       @RequestParam("q") final String nameToLookUp) throws InvalidStellarAddressException {
 
     if (!type.equalsIgnoreCase("name"))
     {
-      return new ResponseEntity<>(FederationResponseBuilder.invalidType(type), HttpStatus.NOT_IMPLEMENTED);
+      return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
     }
 
     final StellarAddress stellarAddress = StellarAddress.parse(nameToLookUp);
@@ -60,7 +64,7 @@ public class FederationServerController {
       ret = FederationResponseBuilder.account(stellarAddress.toString(), accountId.getPublicKey());
     }
 
-    return new ResponseEntity<>(ret, HttpStatus.OK);
+    return new ResponseEntity<>(gson.toJson(ret), HttpStatus.OK);
   }
 
 

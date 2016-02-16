@@ -123,7 +123,7 @@ public class TestPaymentViaMarketMaker {
     suiteCleanup.cleanup();
   }
 
-  @Test
+  //@Test
   public void paymentAtMarketCapacity() throws InterruptedException
   {
     makePayment(firstTenantId, firstTenantApiKey,
@@ -142,7 +142,7 @@ public class TestPaymentViaMarketMaker {
   }
 
 
-  @Test
+  //@Test
   public void paymentAboveMarketCapacity() throws InterruptedException
   {
     makePayment(firstTenantId, firstTenantApiKey,

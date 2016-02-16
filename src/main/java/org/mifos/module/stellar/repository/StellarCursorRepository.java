@@ -15,15 +15,15 @@
  */
 package org.mifos.module.stellar.repository;
 
-
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
+import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
-import org.stellar.base.KeyPair;
+
 
 @Repository
-public interface AccountBridgeRepository
-    extends CrudRepository<AccountBridgePersistency, Long> {
-  AccountBridgePersistency findByMifosTenantId(final String mifosTenantId);
-  AccountBridgePersistency findByStellarAccountId(final String stellarAccountId);
+public interface StellarCursorRepository extends CrudRepository<StellarCursorPersistency, Long> {
+  StellarCursorPersistency findByCursor(String pagingToken);
+  StellarCursorPersistency findByProcessedTrueOrderByIdDesc();
+  void deleteByProcessedTrue();
+
 }

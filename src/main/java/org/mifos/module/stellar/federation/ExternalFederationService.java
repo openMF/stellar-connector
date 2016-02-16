@@ -26,7 +26,8 @@ public class ExternalFederationService {
 
   class StellarResolver
   { //To make a static function mockable.
-    public FederationResponse resolve(final String address) throws IOException {
+    public FederationResponse resolve(final String address)
+        throws IOException, MalformedAddressException {
       return Federation.resolve(address);
     }
   }
@@ -64,6 +65,10 @@ public class ExternalFederationService {
     final org.stellar.sdk.federation.FederationResponse federationResponse;
     try {
       federationResponse = stellarResolver.resolve(stellarAddress.toString());
+    }
+    catch (final MalformedAddressException e)
+    {
+      throw FederationFailedException.malformedAddress(stellarAddress.toString());
     }
     catch (final IOException e)
     {
