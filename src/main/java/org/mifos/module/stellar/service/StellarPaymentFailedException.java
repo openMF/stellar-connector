@@ -16,4 +16,16 @@
 package org.mifos.module.stellar.service;
 
 public class StellarPaymentFailedException extends RuntimeException {
+  public StellarPaymentFailedException(final String msg) {
+    super(msg);
+  }
+
+  public static StellarPaymentFailedException noPathExists(final String assetCode) {
+    return new StellarPaymentFailedException("No path exists in the given currency: " + assetCode);
+  }
+
+  public static StellarPaymentFailedException transactionFailed() {
+    return new StellarPaymentFailedException(
+        "Stellar Horizon server did not accept payment for unknown reason.");
+  }
 }

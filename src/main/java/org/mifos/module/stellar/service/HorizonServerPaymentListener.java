@@ -98,6 +98,7 @@ public class HorizonServerPaymentListener implements EventListener<Operation>{
           StellarAccountId.mainAccount(toAccount.getStellarVaultAccountId()), asset);
 
       //TODO: let mifos know about the money.
+      //TODO: This is a very slow approach.  Better would be to wait for multiple operations, and adjust just once.
     }
     else if (operation instanceof PathPaymentOperation)
     {

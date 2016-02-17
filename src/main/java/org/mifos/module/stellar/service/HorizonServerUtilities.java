@@ -15,6 +15,7 @@
  */
 package org.mifos.module.stellar.service;
 
+import javafx.util.Pair;
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,16 +23,19 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.stellar.base.*;
+import org.stellar.base.Transaction;
+import org.stellar.sdk.*;
 import org.stellar.sdk.Account;
-import org.stellar.sdk.Server;
-import org.stellar.sdk.SubmitTransactionResponse;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.Set;
+
+import static org.mifos.module.stellar.service.StellarAccountHelpers.*;
 
 @Component
 public class HorizonServerUtilities {
@@ -90,7 +94,7 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, StellarAccountCreationFailedException {
 
     final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
-    final Account installationAccount = getAccount(server, installationAccountKeyPair);
+    final Account installationAccount = getAccount(installationAccountKeyPair);
 
     final KeyPair newTenantStellarAccountKeyPair = KeyPair.random();
 
@@ -126,7 +130,7 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, StellarTrustLineAdjustmentFailedException
   {
     final KeyPair trustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
-    final Account trustingAccount = getAccount(server, trustingAccountKeyPair);
+    final Account trustingAccount = getAccount(trustingAccountKeyPair);
 
     final Asset asset = getAsset(assetCode, issuingStellarAccountId);
 
@@ -161,26 +165,23 @@ public class HorizonServerUtilities {
       final char[] stellarAccountPrivateKey)
       throws InvalidConfigurationException, StellarPaymentFailedException
   {
-    pay(targetAccountId, amount, assetCode,
-        issuingAccountId, issuingAccountId, stellarAccountPrivateKey);
+    final Asset asset = getAsset(assetCode, issuingAccountId);
+
+    pay(targetAccountId, amount, asset, asset, stellarAccountPrivateKey);
   }
 
   public void pay(
       final StellarAccountId targetAccountId,
       final BigDecimal amount,
-      final String assetCode,
-      final StellarAccountId sourceIssuer,
-      final StellarAccountId targetIssuer,
+      final Asset sendAsset,
+      final Asset receiveAsset,
       final char[] stellarAccountPrivateKey)
       throws InvalidConfigurationException, StellarPaymentFailedException
   {
     final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
 
-    final Asset sendAsset = getAsset(assetCode, sourceIssuer);
-    final Asset receiveAsset = getAsset(assetCode, targetIssuer);
-
-    final Account sourceAccount = getAccount(server, sourceAccountKeyPair);
+    final Account sourceAccount = getAccount(sourceAccountKeyPair);
 
     final Transaction.Builder transferTransactionBuilder = new Transaction.Builder(sourceAccount);
     final PathPaymentOperation paymentOperation =
@@ -204,11 +205,7 @@ public class HorizonServerUtilities {
     transferTransaction.sign(sourceAccountKeyPair);
 
 
-    submitTransaction(transferTransaction, StellarPaymentFailedException::new);
-  }
-
-  private Asset getAsset(final String assetCode, final StellarAccountId targetIssuer) {
-    return Asset.createNonNativeAsset(assetCode, KeyPair.fromAccountId(targetIssuer.getPublicKey()));
+    submitTransaction(transferTransaction, StellarPaymentFailedException::transactionFailed);
   }
 
   public BigDecimal getBalance(
@@ -216,8 +213,8 @@ public class HorizonServerUtilities {
       final String assetCode)
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
-    final Account tenantAccount = getAccount(server, accountKeyPair);
-    return getBalance(tenantAccount, assetCode);
+    final Account tenantAccount = getAccount(accountKeyPair);
+    return StellarAccountHelpers.getBalance(tenantAccount, assetCode);
   }
 
   public BigDecimal getInstallationAccountBalance(
@@ -238,20 +235,11 @@ public class HorizonServerUtilities {
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
 
-    final Account account = getAccount(server, accountKeyPair);
+    final Account account = getAccount(accountKeyPair);
 
     final Asset asset = getAsset(assetCode, accountIdOfIssuingStellarAddress);
 
     return getBalanceOfAsset(account, asset);
-  }
-
-  private BigDecimal getBalance(final Account tenantAccount, final String assetCode) {
-    final Account.Balance[] balances = tenantAccount.getBalances();
-
-    return Arrays.asList(balances).stream()
-        .filter(balance -> balanceIsInAsset(balance, assetCode))
-        .map(balance -> stellarBalanceToBigDecimal(balance.getBalance()))
-        .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   public BigDecimal currencyTrustSize(
@@ -261,7 +249,7 @@ public class HorizonServerUtilities {
   {
     final KeyPair trustingAccountKeyPair = KeyPair.fromAccountId(trustingAccountId.getPublicKey());
 
-    final Account trustingAccount = getAccount(server, trustingAccountKeyPair);
+    final Account trustingAccount = getAccount(trustingAccountKeyPair);
     final Asset asset = getAsset(assetCode, issuingAccountId);
 
     return getNumericAspectOfAsset(trustingAccount, asset,
@@ -277,7 +265,7 @@ public class HorizonServerUtilities {
 
     final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
 
-    final Account account = getAccount(server, accountKeyPair);
+    final Account account = getAccount(accountKeyPair);
 
     final String assetCode = getAssetCode(asset);
     final Asset vaultAsset = getAsset(assetCode, vaultAccountId);
@@ -350,7 +338,7 @@ public class HorizonServerUtilities {
       final KeyPair installationAccountKeyPair)
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
-    final Account newAccount = getAccount(server, newAccountKeyPair);
+    final Account newAccount = getAccount(newAccountKeyPair);
     final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
 
     final SetOptionsOperation.Builder setOptionsOperationBuilder =
@@ -371,7 +359,7 @@ public class HorizonServerUtilities {
     submitTransaction(setOptionsTransaction, StellarAccountCreationFailedException::new);
   }
 
-  private Account getAccount(final Server server, final KeyPair installationAccountKeyPair)
+  private Account getAccount(final KeyPair installationAccountKeyPair)
       throws InvalidConfigurationException
   {
     final Account installationAccount;
@@ -387,6 +375,86 @@ public class HorizonServerUtilities {
       throw InvalidConfigurationException.invalidInstallationAccountSecretSeed();
     }
     return installationAccount;
+  }
+
+
+  public void findPathPay(
+      final StellarAccountId targetAccountId,
+      final BigDecimal amount,
+      final String assetCode,
+      final char[] stellarAccountPrivateKey)
+      throws InvalidConfigurationException, StellarPaymentFailedException
+  {
+    final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
+    final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
+
+    final Account sourceAccount = getAccount(sourceAccountKeyPair);
+    final Account targetAccount = getAccount(targetAccountKeyPair);
+
+    final Set<Asset>
+        targetAssets = findAssetsWithTrust(targetAccount, amount, assetCode);
+    final Set<Asset>
+        sourceAssets = findAssetsWithBalance(sourceAccount, amount, assetCode);
+
+    final Optional<Pair<Asset, Asset>> assetPair = findAnyMatchingAssetPair(
+        amount, sourceAssets, targetAssets, sourceAccountKeyPair, targetAccountKeyPair);
+    if (!assetPair.isPresent())
+      throw StellarPaymentFailedException.noPathExists(assetCode);
+
+    pay(targetAccountId, amount,
+        assetPair.get().getKey(), assetPair.get().getValue(),
+        stellarAccountPrivateKey);
+  }
+
+  private Optional<Pair<Asset, Asset>> findAnyMatchingAssetPair(
+      final BigDecimal amount,
+      final Set<Asset> sourceAssets,
+      final Set<Asset> targetAssets,
+      final KeyPair sourceAccountKeyPair,
+      final KeyPair targetAccountKeyPair) {
+    //TODO: retries.
+    if (sourceAssets.isEmpty())
+      return Optional.empty();
+
+    for (final Asset targetAsset : targetAssets) {
+      Page<Path> paths;
+      try {
+        paths = server.paths()
+            .sourceAccount(sourceAccountKeyPair)
+            .destinationAccount(targetAccountKeyPair)
+            .destinationAsset(targetAsset)
+            .destinationAmount(bigDecimalToStellarBalance(amount))
+            .execute();
+      } catch (final IOException e) {
+        return Optional.empty();
+      }
+
+      while (paths != null) {
+        for (final Path path : paths.getRecords())
+        {
+          if (stellarBalanceToBigDecimal(path.getSourceAmount()).compareTo(amount) <= 0)
+          {
+            if (sourceAssets.stream().anyMatch(
+                sourceAsset -> sourceAsset.equals(path.getSourceAsset())))
+            {
+              return Optional.of(new Pair<>(path.getSourceAsset(), targetAsset));
+            }
+          }
+        }
+
+        try {
+          paths = ((paths.getLinks() == null) || (paths.getLinks().getNext() == null)) ?
+              null : paths.getNextPage();
+        } catch (final URISyntaxException e) {
+          throw new UnexpectedException();
+        }
+        catch (final IOException e) {
+          return Optional.empty();
+        }
+      }
+    }
+
+    return Optional.empty();
   }
 
   private interface TransactionFailedException<T extends Exception> {
@@ -409,63 +477,5 @@ public class HorizonServerUtilities {
     } catch (final IOException e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
     }
-  }
-
-  private BigDecimal getBalanceOfAsset(
-      final Account sourceAccount,
-      final Asset asset)
-  {
-    return getNumericAspectOfAsset(sourceAccount, asset,
-        balance -> stellarBalanceToBigDecimal(balance.getBalance()));
-  }
-
-  private BigDecimal getNumericAspectOfAsset(
-      final Account sourceAccount,
-      final Asset asset,
-      final Function<Account.Balance, BigDecimal> aspect)
-  {
-    final Optional<BigDecimal> balanceOfGivenAsset
-        = Arrays.asList(sourceAccount.getBalances()).stream()
-        .filter(balance -> getAssetOfBalance(balance).equals(asset))
-        .map(aspect)
-        .max(BigDecimal::compareTo);
-
-    //Theoretically there shouldn't be more than one balance, but if this should turn out to be
-    //incorrect, we return the largest one, rather than adding them together.
-
-    return balanceOfGivenAsset.orElse(BigDecimal.ZERO);
-  }
-
-  private boolean balanceIsInAsset(
-      final Account.Balance balance, final String assetCode)
-  {
-    if (balance.getAssetType() == null)
-      return false;
-
-    if (balance.getAssetCode() == null) {
-      return assetCode.equals("XLM") && balance.getAssetType().equals("native");
-    }
-
-    return balance.getAssetCode().equals(assetCode);
-  }
-
-  private Asset getAssetOfBalance(
-      final Account.Balance balance)
-  {
-    if (balance.getAssetCode() == null)
-      return new AssetTypeNative();
-    else
-      return Asset.createNonNativeAsset(balance.getAssetCode(),
-        KeyPair.fromAccountId(balance.getAssetIssuer()));
-  }
-
-  private BigDecimal stellarBalanceToBigDecimal(final String balance)
-  {
-    return BigDecimal.valueOf(Double.parseDouble(balance));
-  }
-
-  private String bigDecimalToStellarBalance(final BigDecimal balance)
-  {
-    return balance.toString();
   }
 }

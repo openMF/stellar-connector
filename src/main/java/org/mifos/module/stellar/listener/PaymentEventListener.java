@@ -71,10 +71,9 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
     final char[] decodedStellarPrivateKey =
         accountBridgeRepositoryDecorator.getStellarAccountPrivateKey(paymentPayload.sourceTenantId);
 
-    horizonServerUtilities.simplePay(
+    horizonServerUtilities.findPathPay(
         targetAccountId,
         paymentPayload.amount, paymentPayload.assetCode,
-        accountBridgeRepositoryDecorator.getStellarVaultAccountId(paymentPayload.sourceTenantId),
         decodedStellarPrivateKey);
 
     //TODO: find appropriate currency for source and target.
