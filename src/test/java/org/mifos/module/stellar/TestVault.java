@@ -33,7 +33,7 @@ import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
 })
 public class TestVault {
   public static final String ASSET_CODE = "XXX";
-  public static final int MAX_PAY_WAIT = 5000;
+  public static final int MAX_PAY_WAIT = 20000;
 
   @Value("${local.server.port}")
   int bridgePort;

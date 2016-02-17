@@ -271,7 +271,11 @@ public class StellarBridgeTestHelpers {
     final Response restResponse = given()
         .queryParam("type", "name").queryParam("q", tenantStellarAddress).get("/federation/");
 
-    restResponse.then().assertThat().statusCode(HttpStatus.OK.value());
+    int statusCode = restResponse.getStatusCode();
+    if (statusCode != HttpStatus.OK.value())
+    {
+      return Optional.empty();
+    }
 
     final FederationResponse response
         = restResponse.getBody().as(FederationResponse.class, ObjectMapperType.GSON);

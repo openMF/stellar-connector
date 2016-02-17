@@ -49,7 +49,7 @@ public class TestMakePayment {
   public static final String ASSET_CODE = "XXX";
   public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
   public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
-  public static final int MAX_PAY_WAIT = 5000;
+  public static final int MAX_PAY_WAIT = 30000;
 
   @Value("${local.server.port}")
   int bridgePort;
@@ -185,19 +185,34 @@ public class TestMakePayment {
     makePayment(firstTenantId, firstTenantApiKey,
         secondTenantId,
         ASSET_CODE, transferAmount);
+
+    {
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
+          MAX_PAY_WAIT,
+          AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
+
+      if (!missingCredits.isEmpty())
+        logger.info("Missing credits: " + missingCredits);
+    }
+
+    checkBalance(secondTenantId, secondTenantApiKey,
+        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
+        transferAmount);
+
     makePayment(secondTenantId, secondTenantApiKey,
         firstTenantId,
         ASSET_CODE, transferAmount);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-        MAX_PAY_WAIT,
-        AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId),
-        AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
-        AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
-        AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
+    {
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
+          MAX_PAY_WAIT,
+          AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
+          AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
+          AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
 
-    if (!missingCredits.isEmpty())
-      logger.info("Missing credits: " + missingCredits);
+      if (!missingCredits.isEmpty())
+        logger.info("Missing credits: " + missingCredits);
+    }
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -242,6 +257,27 @@ public class TestMakePayment {
   }
 
   @Test
+  public void paymentWithoutPathFails() throws Exception {
+    logger.info("paymentWithoutPathFails test begin");
+
+    final AccountListener accountListener =
+        new AccountListener(serverAddress, thirdTenantId);
+
+    makePayment(firstTenantId, firstTenantApiKey, thirdTenantId, ASSET_CODE, BigDecimal.TEN);
+
+    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
+        MAX_PAY_WAIT,
+        AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, thirdTenantId));
+
+    if (missingCredits.isEmpty())
+      logger.info("A credit which shouldn't have happened did.");
+
+    checkBalance(thirdTenantId, thirdTenantApiKey,
+        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
+        BigDecimal.ZERO);
+  }
+
+  @Test
   public void roundRobinPayments() throws Exception {
     logger.info("roundRobinPayments test begin");
 
@@ -255,35 +291,40 @@ public class TestMakePayment {
     makePayment(secondTenantId, secondTenantApiKey,
         thirdTenantId,
         ASSET_CODE, transferAmount);
+
+    {
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
+          MAX_PAY_WAIT,
+          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
+          AccountListener.credit(thirdTenantId, transferAmount, ASSET_CODE, secondTenantId));
+
+      if (!missingCredits.isEmpty())
+        logger.info("Missing credits: " + missingCredits);
+    }
+
+
     makePayment(thirdTenantId, thirdTenantApiKey,
         firstTenantId,
         ASSET_CODE, transferAmount);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-        MAX_PAY_WAIT,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
-        AccountListener.credit(thirdTenantId, transferAmount, ASSET_CODE, secondTenantId),
-        AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, secondTenantId),
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
-    //Not an exhaustive list of credits which will occur.
+    {
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
+          MAX_PAY_WAIT*5,
+          AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, secondTenantId),
+          AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, firstTenantId),
+          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
+      //Not an exhaustive list of credits which will occur.
 
-    if (!missingCredits.isEmpty())
-      logger.info("Missing credits: " + missingCredits);
+      if (!missingCredits.isEmpty())
+        logger.info("Missing credits: " + missingCredits);
+    }
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
         BigDecimal.ZERO);
-    checkBalance(firstTenantId, firstTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(thirdTenantId),
-        BigDecimal.ZERO);
-
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         BigDecimal.ZERO);
-    checkBalance(secondTenantId, secondTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(thirdTenantId),
-        BigDecimal.ZERO);
-
     checkBalance(thirdTenantId, thirdTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         BigDecimal.ZERO);
@@ -324,7 +365,12 @@ public class TestMakePayment {
       transfers.addAll(Collections.nCopies(10,
           AccountListener.credit(firstTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
 
-      accountListener.waitForCredits(MAX_PAY_WAIT, transfers);
+
+      final List<AccountListener.Credit> leftOverTransfers =
+          accountListener.waitForCredits(MAX_PAY_WAIT*2, transfers);
+
+      if (!leftOverTransfers.isEmpty())
+        logger.info("Not all transfers completed.");
     }
 
     checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -346,7 +392,11 @@ public class TestMakePayment {
           AccountListener.credit(secondTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
       transfers.add(AccountListener.credit(secondTenantId, lastBit, ASSET_CODE, firstTenantId));
 
-      accountListener.waitForCredits(MAX_PAY_WAIT, transfers);
+      final List<AccountListener.Credit> leftOverTransfers
+          = accountListener.waitForCredits(MAX_PAY_WAIT * 2, transfers);
+
+      if (!leftOverTransfers.isEmpty())
+        logger.info("Not all transfers completed.");
     }
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
@@ -362,4 +412,7 @@ public class TestMakePayment {
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         TRUST_LIMIT);
   }
+
+  //TODO: still needed a test which stops and starts the bridge component, but makes transactions
+  //TODO: against Stellar while the bridge component is down.
 }

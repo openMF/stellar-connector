@@ -45,7 +45,7 @@ public class TestPaymentViaMarketMaker {
   public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
   public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
   public static final BigDecimal MARKET_SIZE = BigDecimal.valueOf(100);
-  public static final int MAX_PAY_WAIT = 5000;
+  public static final int MAX_PAY_WAIT = 20000;
 
   @Value("${local.server.port}")
   int bridgePort;
