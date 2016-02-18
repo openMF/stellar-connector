@@ -44,7 +44,7 @@ import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
     "stellar.new-account-initial-balance=1020",
     "stellar.local-federation-domain=" + TEST_ADDRESS_DOMAIN
 })
-public class TestMakePayment {
+public class TestPaymentInSimpleNetwork {
 
   public static final String ASSET_CODE = "XXX";
   public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
@@ -58,15 +58,13 @@ public class TestMakePayment {
   String serverAddress;
 
 
-  private Logger logger = LoggerFactory.getLogger(TestMakePayment.class.getName());
+  private Logger logger = LoggerFactory.getLogger(TestPaymentInSimpleNetwork.class.getName());
   private Cleanup testCleanup = new Cleanup();
   private final static Cleanup suiteCleanup = new Cleanup();
   private String firstTenantId;
   private String firstTenantApiKey;
   private String secondTenantId;
   private String secondTenantApiKey;
-  private String thirdTenantId;
-  private String thirdTenantApiKey;
 
   @BeforeClass
   public static void setupSystem() throws IOException, InterruptedException {
@@ -94,10 +92,6 @@ public class TestMakePayment {
     final String secondTenantVaultAddress = tenantVaultStellarAddress(secondTenantId);
     logger.info("Second tenant setup {} with vault size {}.", secondTenantId, VAULT_BALANCE);
 
-    thirdTenantId = UUID.randomUUID().toString();
-    thirdTenantApiKey = createAndDestroyBridge(thirdTenantId, testCleanup);
-    logger.info("Third tenant setup {} without vault.", thirdTenantId);
-
 
     createAndDestroyTrustLine(
         secondTenantId, secondTenantApiKey, firstTenantVaultAddress, ASSET_CODE, TRUST_LIMIT,
@@ -105,10 +99,6 @@ public class TestMakePayment {
 
     createAndDestroyTrustLine(
         firstTenantId, firstTenantApiKey, secondTenantVaultAddress, ASSET_CODE, TRUST_LIMIT,
-        testCleanup);
-
-    createAndDestroyTrustLine(
-        thirdTenantId, thirdTenantApiKey, secondTenantVaultAddress, ASSET_CODE, TRUST_LIMIT,
         testCleanup);
   }
 
@@ -253,83 +243,6 @@ public class TestMakePayment {
         transferAmount);
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
-        BigDecimal.ZERO);
-  }
-
-  @Test
-  public void paymentWithoutPathFails() throws Exception {
-    logger.info("paymentWithoutPathFails test begin");
-
-    final AccountListener accountListener =
-        new AccountListener(serverAddress, thirdTenantId);
-
-    makePayment(firstTenantId, firstTenantApiKey, thirdTenantId, ASSET_CODE, BigDecimal.TEN);
-
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-        MAX_PAY_WAIT,
-        AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, thirdTenantId));
-
-    if (missingCredits.isEmpty())
-      logger.info("A credit which shouldn't have happened did.");
-
-    checkBalance(thirdTenantId, thirdTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
-        BigDecimal.ZERO);
-  }
-
-  @Test
-  public void roundRobinPayments() throws Exception {
-    logger.info("roundRobinPayments test begin");
-
-    final AccountListener accountListener =
-        new AccountListener(serverAddress, firstTenantId, secondTenantId, thirdTenantId);
-
-    final BigDecimal transferAmount = BigDecimal.TEN;
-    makePayment(firstTenantId, firstTenantApiKey,
-        secondTenantId,
-        ASSET_CODE, transferAmount);
-    makePayment(secondTenantId, secondTenantApiKey,
-        thirdTenantId,
-        ASSET_CODE, transferAmount);
-
-    {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-          MAX_PAY_WAIT,
-          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
-          AccountListener.credit(thirdTenantId, transferAmount, ASSET_CODE, secondTenantId));
-
-      if (!missingCredits.isEmpty())
-        logger.info("Missing credits: " + missingCredits);
-    }
-
-
-    makePayment(thirdTenantId, thirdTenantApiKey,
-        firstTenantId,
-        ASSET_CODE, transferAmount);
-
-    {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-          MAX_PAY_WAIT*5,
-          AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, secondTenantId),
-          AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, firstTenantId),
-          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
-      //Not an exhaustive list of credits which will occur.
-
-      if (!missingCredits.isEmpty())
-        logger.info("Missing credits: " + missingCredits);
-    }
-
-    checkBalance(firstTenantId, firstTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
-        BigDecimal.ZERO);
-    checkBalance(secondTenantId, secondTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
-        BigDecimal.ZERO);
-    checkBalance(thirdTenantId, thirdTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
-        BigDecimal.ZERO);
-    checkBalance(thirdTenantId, thirdTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
         BigDecimal.ZERO);
   }
 
