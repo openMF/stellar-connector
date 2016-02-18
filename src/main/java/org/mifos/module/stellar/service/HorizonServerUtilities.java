@@ -282,7 +282,7 @@ public class HorizonServerUtilities {
                 getAssetOfBalance(balance),
                 vaultAsset,
                 balanceOfVaultAsset.min(stellarBalanceToBigDecimal(balance.getBalance()))))
-        .forEachOrdered(transactionBuilder::addOperation);
+        .forEach(transactionBuilder::addOperation);
 
     final Transaction transaction = transactionBuilder.build();
     transaction.sign(accountKeyPair);
@@ -435,8 +435,7 @@ public class HorizonServerUtilities {
         {
           if (stellarBalanceToBigDecimal(path.getSourceAmount()).compareTo(amount) <= 0)
           {
-            if (sourceAssets.stream().anyMatch(
-                sourceAsset -> sourceAsset.equals(path.getSourceAsset())))
+            if (sourceAssets.contains(path.getSourceAsset()))
             {
               return Optional.of(new Pair<>(path.getSourceAsset(), targetAsset));
             }
