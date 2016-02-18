@@ -156,24 +156,6 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
-  public static void createSameCurrencyPassiveOffer(
-      final String marketMakerTenantId, final String marketMakerTenantApiKey,
-      final String assetCode, final BigDecimal maximumAmount,
-      final String buyingIssuerAddress, final String sellingIssuerAddress)
-  {
-    final PassiveOfferData offer = new PassiveOfferData(
-        assetCode, buyingIssuerAddress,
-        assetCode, sellingIssuerAddress,
-        maximumAmount, BigDecimal.ONE);
-
-    given().header(CONTENT_TYPE_HEADER)
-        .header(API_KEY_HEADER_LABEL, marketMakerTenantApiKey)
-        .header(TENANT_ID_HEADER_LABEL, marketMakerTenantId)
-        .body(offer)
-        .post("/modules/stellar/bridge/market/")
-        .then().assertThat().statusCode(HttpStatus.CREATED.value());
-  }
-
   public static void makePayment(
       final String fromTenant,
       final String fromTenantApiKey,
