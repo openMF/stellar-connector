@@ -22,10 +22,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.stellar.base.*;
-import org.stellar.base.Transaction;
 import org.stellar.sdk.*;
-import org.stellar.sdk.Account;
+import org.stellar.sdk.responses.AccountResponse;
+import org.stellar.sdk.responses.Page;
+import org.stellar.sdk.responses.PathResponse;
+import org.stellar.sdk.responses.SubmitTransactionResponse;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
@@ -94,7 +95,7 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, StellarAccountCreationFailedException {
 
     final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
-    final Account installationAccount = getAccount(installationAccountKeyPair);
+    final AccountResponse installationAccount = getAccount(installationAccountKeyPair);
 
     final KeyPair newTenantStellarAccountKeyPair = KeyPair.random();
 
@@ -130,7 +131,7 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, StellarTrustLineAdjustmentFailedException
   {
     final KeyPair trustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
-    final Account trustingAccount = getAccount(trustingAccountKeyPair);
+    final AccountResponse trustingAccount = getAccount(trustingAccountKeyPair);
 
     final Asset asset = getAsset(assetCode, issuingStellarAccountId);
 
@@ -181,7 +182,7 @@ public class HorizonServerUtilities {
     final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
 
-    final Account sourceAccount = getAccount(sourceAccountKeyPair);
+    final AccountResponse sourceAccount = getAccount(sourceAccountKeyPair);
 
     final Transaction.Builder transferTransactionBuilder = new Transaction.Builder(sourceAccount);
     final PathPaymentOperation paymentOperation =
@@ -213,7 +214,7 @@ public class HorizonServerUtilities {
       final String assetCode)
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
-    final Account tenantAccount = getAccount(accountKeyPair);
+    final AccountResponse tenantAccount = getAccount(accountKeyPair);
     return StellarAccountHelpers.getBalance(tenantAccount, assetCode);
   }
 
@@ -235,7 +236,7 @@ public class HorizonServerUtilities {
   {
     final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
 
-    final Account account = getAccount(accountKeyPair);
+    final AccountResponse account = getAccount(accountKeyPair);
 
     final Asset asset = getAsset(assetCode, accountIdOfIssuingStellarAddress);
 
@@ -249,7 +250,7 @@ public class HorizonServerUtilities {
   {
     final KeyPair trustingAccountKeyPair = KeyPair.fromAccountId(trustingAccountId.getPublicKey());
 
-    final Account trustingAccount = getAccount(trustingAccountKeyPair);
+    final AccountResponse trustingAccount = getAccount(trustingAccountKeyPair);
     final Asset asset = getAsset(assetCode, issuingAccountId);
 
     return getNumericAspectOfAsset(trustingAccount, asset,
@@ -265,7 +266,7 @@ public class HorizonServerUtilities {
 
     final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
 
-    final Account account = getAccount(accountKeyPair);
+    final AccountResponse account = getAccount(accountKeyPair);
 
     final String assetCode = getAssetCode(asset);
     final Asset vaultAsset = getAsset(assetCode, vaultAccountId);
@@ -307,7 +308,7 @@ public class HorizonServerUtilities {
   private void createAccountForKeyPair(
       final KeyPair newAccountKeyPair,
       final KeyPair installationAccountKeyPair,
-      final Account installationAccount)
+      final AccountResponse installationAccount)
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final Transaction.Builder transactionBuilder = new Transaction.Builder(installationAccount);
@@ -338,7 +339,7 @@ public class HorizonServerUtilities {
       final KeyPair installationAccountKeyPair)
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
-    final Account newAccount = getAccount(newAccountKeyPair);
+    final AccountResponse newAccount = getAccount(newAccountKeyPair);
     final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
 
     final SetOptionsOperation.Builder setOptionsOperationBuilder =
@@ -359,10 +360,10 @@ public class HorizonServerUtilities {
     submitTransaction(setOptionsTransaction, StellarAccountCreationFailedException::new);
   }
 
-  private Account getAccount(final KeyPair installationAccountKeyPair)
+  private AccountResponse getAccount(final KeyPair installationAccountKeyPair)
       throws InvalidConfigurationException
   {
-    final Account installationAccount;
+    final AccountResponse installationAccount;
     try {
       installationAccount = server.accounts().account(installationAccountKeyPair);
     }
@@ -388,8 +389,8 @@ public class HorizonServerUtilities {
     final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
 
-    final Account sourceAccount = getAccount(sourceAccountKeyPair);
-    final Account targetAccount = getAccount(targetAccountKeyPair);
+    final AccountResponse sourceAccount = getAccount(sourceAccountKeyPair);
+    final AccountResponse targetAccount = getAccount(targetAccountKeyPair);
 
     final Set<Asset>
         targetAssets = findAssetsWithTrust(targetAccount, amount, assetCode);
@@ -417,7 +418,7 @@ public class HorizonServerUtilities {
       return Optional.empty();
 
     for (final Asset targetAsset : targetAssets) {
-      Page<Path> paths;
+      Page<PathResponse> paths;
       try {
         paths = server.paths()
             .sourceAccount(sourceAccountKeyPair)
@@ -430,7 +431,7 @@ public class HorizonServerUtilities {
       }
 
       while (paths != null) {
-        for (final Path path : paths.getRecords())
+        for (final PathResponse path : paths.getRecords())
         {
           if (stellarBalanceToBigDecimal(path.getSourceAmount()).compareTo(amount) <= 0)
           {

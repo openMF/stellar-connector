@@ -26,7 +26,7 @@ import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.command.PullImageResultCallback;
-import org.stellar.base.KeyPair;
+import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.Server;
 
 import java.io.IOException;

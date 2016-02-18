@@ -22,7 +22,7 @@ import org.mifos.module.stellar.repository.StellarCursorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.stellar.base.KeyPair;
+import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.requests.PaymentsRequestBuilder;
 
 import javax.annotation.PostConstruct;

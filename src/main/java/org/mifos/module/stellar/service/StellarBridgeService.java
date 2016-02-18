@@ -26,7 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.stereotype.Service;
-import org.stellar.base.KeyPair;
+import org.stellar.sdk.KeyPair;
 
 import java.math.BigDecimal;
 import java.util.Date;

@@ -16,13 +16,13 @@
 package org.mifos.module.stellar;
 
 import javafx.util.Pair;
-import org.stellar.base.Asset;
-import org.stellar.base.AssetTypeCreditAlphaNum;
-import org.stellar.base.KeyPair;
-import org.stellar.sdk.effects.AccountCreditedEffect;
-import org.stellar.sdk.effects.Effect;
+import org.stellar.sdk.Asset;
+import org.stellar.sdk.AssetTypeCreditAlphaNum;
+import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.requests.EffectsRequestBuilder;
 import org.stellar.sdk.requests.EventListener;
+import org.stellar.sdk.responses.effects.AccountCreditedEffectResponse;
+import org.stellar.sdk.responses.effects.EffectResponse;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -84,15 +84,15 @@ public class AccountListener {
     return new Credit(toTenantId, amount, assetCode, issuingTenantVault);
   }
 
-  class Listener implements EventListener<Effect> {
+  class Listener implements EventListener<EffectResponse> {
 
-    @Override public void onEvent(final Effect effect) {
-      if (effect instanceof AccountCreditedEffect)
+    @Override public void onEvent(final EffectResponse effect) {
+      if (effect instanceof AccountCreditedEffectResponse)
       {
         final String to = stellarIdToTenantId.get(effect.getAccount().getAccountId());
         final BigDecimal amount
-            = BigDecimal.valueOf(Double.parseDouble(((AccountCreditedEffect) effect).getAmount()));
-        final Asset asset = ((AccountCreditedEffect) effect).getAsset();
+            = BigDecimal.valueOf(Double.parseDouble(((AccountCreditedEffectResponse) effect).getAmount()));
+        final Asset asset = ((AccountCreditedEffectResponse) effect).getAsset();
         final String code;
         final String issuer;
         if (asset instanceof AssetTypeCreditAlphaNum)

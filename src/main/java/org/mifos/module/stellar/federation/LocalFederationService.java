@@ -23,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.stellar.base.KeyPair;
+import org.stellar.sdk.KeyPair;
 
 @Service
 public class LocalFederationService {

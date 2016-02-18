@@ -20,7 +20,7 @@ import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.stellar.base.KeyPair;
+import org.stellar.sdk.KeyPair;
 
 @Component
 public class AccountBridgeRepositoryDecorator {

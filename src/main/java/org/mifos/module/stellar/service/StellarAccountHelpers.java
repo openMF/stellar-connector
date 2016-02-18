@@ -16,10 +16,10 @@
 package org.mifos.module.stellar.service;
 
 import org.mifos.module.stellar.federation.StellarAccountId;
-import org.stellar.base.Asset;
-import org.stellar.base.AssetTypeNative;
-import org.stellar.base.KeyPair;
-import org.stellar.sdk.Account;
+import org.stellar.sdk.Asset;
+import org.stellar.sdk.AssetTypeNative;
+import org.stellar.sdk.KeyPair;
+import org.stellar.sdk.responses.AccountResponse;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 class StellarAccountHelpers {
   static BigDecimal getBalanceOfAsset(
-      final Account sourceAccount,
+      final AccountResponse sourceAccount,
       final Asset asset)
   {
     return getNumericAspectOfAsset(sourceAccount, asset,
@@ -38,9 +38,9 @@ class StellarAccountHelpers {
   }
 
   static BigDecimal getNumericAspectOfAsset(
-      final Account sourceAccount,
+      final AccountResponse sourceAccount,
       final Asset asset,
-      final Function<Account.Balance, BigDecimal> aspect)
+      final Function<AccountResponse.Balance, BigDecimal> aspect)
   {
     final Optional<BigDecimal> balanceOfGivenAsset
         = Arrays.asList(sourceAccount.getBalances()).stream()
@@ -55,7 +55,7 @@ class StellarAccountHelpers {
   }
 
   static boolean balanceIsInAsset(
-      final Account.Balance balance, final String assetCode)
+      final AccountResponse.Balance balance, final String assetCode)
   {
     if (balance.getAssetType() == null)
       return false;
@@ -68,7 +68,7 @@ class StellarAccountHelpers {
   }
 
   static Asset getAssetOfBalance(
-      final Account.Balance balance)
+      final AccountResponse.Balance balance)
   {
     if (balance.getAssetCode() == null)
       return new AssetTypeNative();
@@ -92,8 +92,8 @@ class StellarAccountHelpers {
     return Asset.createNonNativeAsset(assetCode, KeyPair.fromAccountId(targetIssuer.getPublicKey()));
   }
 
-  static BigDecimal getBalance(final Account tenantAccount, final String assetCode) {
-    final Account.Balance[] balances = tenantAccount.getBalances();
+  static BigDecimal getBalance(final AccountResponse tenantAccount, final String assetCode) {
+    final AccountResponse.Balance[] balances = tenantAccount.getBalances();
 
     return Arrays.asList(balances).stream()
         .filter(balance -> balanceIsInAsset(balance, assetCode))
@@ -102,7 +102,7 @@ class StellarAccountHelpers {
   }
 
   static Set<Asset> findAssetsWithBalance(
-      final Account account,
+      final AccountResponse account,
       final BigDecimal amount,
       final String assetCode) {
 
@@ -111,7 +111,7 @@ class StellarAccountHelpers {
   }
 
   static Set<Asset> findAssetsWithTrust(
-      final Account account,
+      final AccountResponse account,
       final BigDecimal amount,
       final String assetCode) {
 
@@ -119,17 +119,17 @@ class StellarAccountHelpers {
         StellarAccountHelpers::remainingTrustInBalance);
   }
 
-  static BigDecimal remainingTrustInBalance(final Account.Balance balance)
+  static BigDecimal remainingTrustInBalance(final AccountResponse.Balance balance)
   {
     return stellarBalanceToBigDecimal(balance.getLimit())
         .subtract(stellarBalanceToBigDecimal(balance.getBalance()));
   }
 
   private static Set<Asset> findAssetsWithAspect(
-      final Account account,
+      final AccountResponse account,
       final BigDecimal amount,
       final String assetCode,
-      final Function<Account.Balance, BigDecimal> numericAspect)
+      final Function<AccountResponse.Balance, BigDecimal> numericAspect)
   {
     return Arrays.asList(account.getBalances()).stream()
         .filter(balance -> balanceIsInAsset(balance, assetCode))

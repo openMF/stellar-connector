@@ -24,14 +24,14 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.stellar.base.Asset;
-import org.stellar.sdk.operations.Operation;
-import org.stellar.sdk.operations.PathPaymentOperation;
-import org.stellar.sdk.operations.PaymentOperation;
+import org.stellar.sdk.Asset;
 import org.stellar.sdk.requests.EventListener;
+import org.stellar.sdk.responses.operations.OperationResponse;
+import org.stellar.sdk.responses.operations.PathPaymentOperationResponse;
+import org.stellar.sdk.responses.operations.PaymentOperationResponse;
 
 @Component
-public class HorizonServerPaymentListener implements EventListener<Operation>{
+public class HorizonServerPaymentListener implements EventListener<OperationResponse> {
 
   private final AccountBridgeRepository accountBridgeRepository;
   private final StellarCursorRepository stellarCursorRepository;
@@ -52,7 +52,7 @@ public class HorizonServerPaymentListener implements EventListener<Operation>{
     this.logger = logger;
   }
 
-  @Override public void onEvent(final Operation operation) {
+  @Override public void onEvent(final OperationResponse operation) {
     final String pagingToken = operation.getPagingToken();
 
     final StellarCursorPersistency cursorPersistency = markPlace(pagingToken);
@@ -77,11 +77,11 @@ public class HorizonServerPaymentListener implements EventListener<Operation>{
     return stellarCursorRepository.save(new StellarCursorPersistency(pagingToken));
   }
 
-  private void handleOperation(final Operation operation) {
+  private void handleOperation(final OperationResponse operation) {
 
-    if (operation instanceof PaymentOperation)
+    if (operation instanceof PaymentOperationResponse)
     {
-      final PaymentOperation paymentOperation = (PaymentOperation) operation;
+      final PaymentOperationResponse paymentOperation = (PaymentOperationResponse) operation;
       final AccountBridgePersistency toAccount
           = accountBridgeRepository.findByStellarAccountId(paymentOperation.getTo().getAccountId());
       if (toAccount == null)
@@ -100,9 +100,9 @@ public class HorizonServerPaymentListener implements EventListener<Operation>{
       //TODO: let mifos know about the money.
       //TODO: This is a very slow approach.  Better would be to wait for multiple operations, and adjust just once.
     }
-    else if (operation instanceof PathPaymentOperation)
+    else if (operation instanceof PathPaymentOperationResponse)
     {
-      final PathPaymentOperation pathPaymentOperation = (PathPaymentOperation)operation;
+      final PathPaymentOperationResponse pathPaymentOperation = (PathPaymentOperationResponse)operation;
 
       final AccountBridgePersistency toAccount
           = accountBridgeRepository.findByStellarAccountId(pathPaymentOperation.getTo().getAccountId());
