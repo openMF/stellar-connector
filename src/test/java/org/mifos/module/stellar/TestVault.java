@@ -62,7 +62,7 @@ public class TestVault {
         .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
         .pathParameter("assetCode", assetCode)
         .body(amount)
-        .put("/modules/stellar/bridge/vault/{assetCode}/")
+        .put("/modules/stellarbridge/vault/{assetCode}/")
         .then().assertThat().statusCode(HttpStatus.CONFLICT.value())
         .content(balanceMatches(finalBalance));
   }
@@ -81,7 +81,7 @@ public class TestVault {
         .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
         .pathParameter("assetCode", assetCode)
         .body(amount)
-        .put("/modules/stellar/bridge/vault/{assetCode}/")
+        .put("/modules/stellarbridge/vault/{assetCode}/")
         .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value())
         .content(balanceMatches(requestedBalance));
   }
@@ -96,7 +96,7 @@ public class TestVault {
         .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
         .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
         .pathParameter("assetCode", assetCode)
-        .get("/modules/stellar/bridge/vault/{assetCode}/")
+        .get("/modules/stellarbridge/vault/{assetCode}/")
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(balance));
   }
@@ -110,7 +110,7 @@ public class TestVault {
         .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
         .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantId)
         .pathParameter("assetCode", assetCode)
-        .get("/modules/stellar/bridge/vault/{assetCode}/")
+        .get("/modules/stellarbridge/vault/{assetCode}/")
         .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
   }
 
@@ -268,7 +268,7 @@ public class TestVault {
         .pathParameter("assetCode", ASSET_CODE)
         .pathParameter("issuer", issuer)
         .body(trustLine)
-        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .put("/modules/stellarbridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
   }
 }

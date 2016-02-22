@@ -60,7 +60,7 @@ public class StellarBridgeTestHelpers {
         given()
             .header(CONTENT_TYPE_HEADER)
             .body(newAccount)
-            .post("/modules/stellar/bridge");
+            .post("/modules/stellarbridge");
 
     creationResponse
         .then().assertThat().statusCode(HttpStatus.CREATED.value());
@@ -74,7 +74,7 @@ public class StellarBridgeTestHelpers {
         given()
             .header(StellarBridgeTestHelpers.API_KEY_HEADER_LABEL, apiKey)
             .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
-            .delete("/modules/stellar/bridge");
+            .delete("/modules/stellarbridge");
 
     deletionResponse
         .then().assertThat().statusCode(HttpStatus.OK.value());
@@ -94,7 +94,7 @@ public class StellarBridgeTestHelpers {
         .header(StellarBridgeTestHelpers.TENANT_ID_HEADER_LABEL, tenantName)
         .pathParameter("assetCode", assetCode)
         .body(amount)
-        .put("/modules/stellar/bridge/vault/{assetCode}/")
+        .put("/modules/stellarbridge/vault/{assetCode}/")
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(balance));
   }
@@ -129,7 +129,7 @@ public class StellarBridgeTestHelpers {
         .pathParameter("assetCode", assetCode)
         .pathParameter("issuer", issuer)
         .body(trustLine)
-        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .put("/modules/stellarbridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
@@ -152,7 +152,7 @@ public class StellarBridgeTestHelpers {
         .pathParam("assetCode", assetCode)
         .pathParam("issuer", issuer)
         .body(new TrustLineConfiguration(BigDecimal.ZERO))
-        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .put("/modules/stellarbridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.OK.value());
   }
 
@@ -175,8 +175,8 @@ public class StellarBridgeTestHelpers {
         .header(ENTITY_HEADER_LABEL, ENTITY_HEADER_VALUE)
         .header(ACTION_HEADER_LABEL, ACTION_HEADER_VALUE)
         .body(payment)
-        .post("/modules/stellar/bridge/payments/")
-        .then().assertThat().statusCode(HttpStatus.CREATED.value());
+        .post("/modules/stellarbridge/payments/")
+        .then().assertThat().statusCode(HttpStatus.ACCEPTED.value());
   }
 
   public static void checkBalance(
@@ -198,7 +198,7 @@ public class StellarBridgeTestHelpers {
         .header(TENANT_ID_HEADER_LABEL, tenant)
         .pathParam("assetCode", assetCode)
         .pathParam("issuer", issuer)
-        .get("/modules/stellar/bridge/balances/{assetCode}/{issuer}/")
+        .get("/modules/stellarbridge/balances/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.OK.value())
         .content(balanceMatches(amount));
   }
@@ -221,7 +221,7 @@ public class StellarBridgeTestHelpers {
         .header(TENANT_ID_HEADER_LABEL, tenant)
         .pathParam("assetCode", assetCode)
         .pathParam("issuer", issuer)
-        .get("/modules/stellar/bridge/balances/{assetCode}/{issuer}/")
+        .get("/modules/stellarbridge/balances/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
   }
 

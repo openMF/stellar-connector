@@ -109,7 +109,7 @@ public class TestCreateTrustLine {
         .pathParameter("assetCode", ASSET_CODE)
         .pathParameter("issuer", issuer)
         .body(trustLine)
-        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .put("/modules/stellarbridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.UNAUTHORIZED.value());
   }
 
@@ -130,7 +130,7 @@ public class TestCreateTrustLine {
         .pathParameter("assetCode", ASSET_CODE)
         .pathParameter("issuer", issuer)
         .body(trustLine)
-        .put("/modules/stellar/bridge/trustlines/{assetCode}/{issuer}/")
+        .put("/modules/stellarbridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.NOT_FOUND.value());
   }
 

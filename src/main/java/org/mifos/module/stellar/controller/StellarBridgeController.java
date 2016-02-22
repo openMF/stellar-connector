@@ -36,7 +36,7 @@ import java.math.BigDecimal;
 import java.net.URLDecoder;
 
 @RestController()
-@RequestMapping("/modules")
+@RequestMapping("/modules/stellarbridge")
 public class StellarBridgeController {
   private static final String API_KEY_HEADER_LABEL = "X-Stellar-Bridge-API-Key";
   private static final String TENANT_ID_HEADER_LABEL = "X-Mifos-Platform-TenantId";
@@ -59,34 +59,41 @@ public class StellarBridgeController {
     this.gson = gson;
   }
 
-  @RequestMapping(value = "/stellar/bridge/payments/", method = RequestMethod.POST,
+  @RequestMapping(value = "", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<Void> sendStellarPayment(
+  public ResponseEntity<String> createStellarBridgeConfiguration(
+      @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
+  {
+    final String mifosTenantId = stellarBridgeConfig.getMifosTenantId();
+    final String newApiKey = this.securityService.generateApiKey(mifosTenantId);
+    stellarBridgeService.createStellarBridgeConfig(
+        stellarBridgeConfig.getMifosTenantId(),
+        stellarBridgeConfig.getMifosToken());
+
+    return new ResponseEntity<>(newApiKey, HttpStatus.CREATED);
+  }
+
+  @RequestMapping(value = "", method = RequestMethod.DELETE,
+      produces = {"application/json"})
+  public ResponseEntity<Void> deleteAccountBridgeConfiguration(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
-      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
-      @RequestHeader("X-Mifos-Entity") final String entity,
-      @RequestHeader("X-Mifos-Action") final String action,
-      @RequestBody final String payload)
-      throws SecurityException {
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId)
+  {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
+    this.securityService.removeApiKey(mifosTenantId);
 
-    if (entity.equalsIgnoreCase("JOURNALENTRY")
-        && action.equalsIgnoreCase("CREATE"))
+    if (stellarBridgeService.deleteAccountBridgeConfig(mifosTenantId))
     {
-      final JournalEntryData journalEntry = gson.fromJson(payload, JournalEntryData.class);
-
-      final PaymentPersistency payment =
-          journalEntryPaymentMapper.mapToPayment(mifosTenantId, journalEntry);
-
-      this.stellarBridgeService.sendPaymentToStellar(payment);
+      return new ResponseEntity<>(HttpStatus.OK);
     }
-
-
-    return new ResponseEntity<>(HttpStatus.CREATED);
+    else
+    {
+      return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
   }
 
   @RequestMapping(
-      value = "/stellar/bridge/trustlines/{assetCode}/{issuer}/",
+      value = "/trustlines/{assetCode}/{issuer}/",
       method = RequestMethod.PUT,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<Void> adjustTrustLine(
@@ -116,40 +123,7 @@ public class StellarBridgeController {
     return new ResponseEntity<>(HttpStatus.OK);
   }
 
-  @RequestMapping(value = "/stellar/bridge", method = RequestMethod.POST,
-                  consumes = {"application/json"}, produces = {"application/json"})
-  public ResponseEntity<String> createStellarBridgeConfiguration(
-      @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
-  {
-    final String mifosTenantId = stellarBridgeConfig.getMifosTenantId();
-    final String newApiKey = this.securityService.generateApiKey(mifosTenantId);
-    stellarBridgeService.createStellarBridgeConfig(
-        stellarBridgeConfig.getMifosTenantId(),
-        stellarBridgeConfig.getMifosToken());
-
-    return new ResponseEntity<>(newApiKey, HttpStatus.CREATED);
-  }
-
-  @RequestMapping(value = "/stellar/bridge", method = RequestMethod.DELETE,
-      produces = {"application/json"})
-  public ResponseEntity<Void> deleteAccountBridgeConfiguration(
-      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
-      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId)
-  {
-    this.securityService.verifyApiKey(apiKey, mifosTenantId);
-    this.securityService.removeApiKey(mifosTenantId);
-
-    if (stellarBridgeService.deleteAccountBridgeConfig(mifosTenantId))
-    {
-      return new ResponseEntity<>(HttpStatus.OK);
-    }
-    else
-    {
-      return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-    }
-  }
-
-  @RequestMapping(value = "/stellar/bridge/vault/{assetCode}",
+  @RequestMapping(value = "/vault/{assetCode}",
       method = RequestMethod.PUT,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<BigDecimal> adjustVaultIssuedAssets(
@@ -160,7 +134,7 @@ public class StellarBridgeController {
   {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
     //TODO: add security for currency issuing.
-    BigDecimal amount = amountConfiguration.getAmount();
+    final BigDecimal amount = amountConfiguration.getAmount();
     if (amount.compareTo(BigDecimal.ZERO) < 0)
     {
       return new ResponseEntity<>(amount, HttpStatus.BAD_REQUEST);
@@ -175,7 +149,7 @@ public class StellarBridgeController {
       return new ResponseEntity<>(amountAdjustedTo, HttpStatus.OK);
   }
 
-  @RequestMapping(value = "/stellar/bridge/vault/{assetCode}",
+  @RequestMapping(value = "/vault/{assetCode}",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<BigDecimal> getVaultIssuedAssets(
@@ -195,7 +169,7 @@ public class StellarBridgeController {
   }
 
   @RequestMapping(
-      value = "/stellar/bridge/balances/{assetCode}",
+      value = "/balances/{assetCode}",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<BigDecimal> getStellarAccountBalance(
@@ -211,7 +185,7 @@ public class StellarBridgeController {
   }
 
   @RequestMapping(
-      value = "/stellar/bridge/balances/{assetCode}/{issuer}/",
+      value = "/balances/{assetCode}/{issuer}/",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<BigDecimal> getStellarAccountBalanceByIssuer(
@@ -236,8 +210,34 @@ public class StellarBridgeController {
         HttpStatus.OK);
   }
 
+  @RequestMapping(value = "/payments/", method = RequestMethod.POST,
+      consumes = {"application/json"}, produces = {"application/json"})
+  public ResponseEntity<Void> sendStellarPayment(
+      @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
+      @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId,
+      @RequestHeader("X-Mifos-Entity") final String entity,
+      @RequestHeader("X-Mifos-Action") final String action,
+      @RequestBody final String payload)
+      throws SecurityException {
+    this.securityService.verifyApiKey(apiKey, mifosTenantId);
+
+    if (entity.equalsIgnoreCase("JOURNALENTRY")
+        && action.equalsIgnoreCase("CREATE"))
+    {
+      final JournalEntryData journalEntry = gson.fromJson(payload, JournalEntryData.class);
+
+      final PaymentPersistency payment =
+          journalEntryPaymentMapper.mapToPayment(mifosTenantId, journalEntry);
+
+      this.stellarBridgeService.sendPaymentToStellar(payment);
+    }
+
+
+    return new ResponseEntity<>(HttpStatus.ACCEPTED);
+  }
+
   @RequestMapping(
-      value = "/stellar/installationaccount/balances/{assetCode}/{issuer}/",
+      value = "/installationaccount/balances/{assetCode}/{issuer}/",
       method = RequestMethod.GET,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<BigDecimal> getInstallationAccountBalance(
