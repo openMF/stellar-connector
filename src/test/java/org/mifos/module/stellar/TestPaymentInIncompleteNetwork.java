@@ -187,7 +187,6 @@ public class TestPaymentInIncompleteNetwork {
           AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, secondTenantId),
           AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, firstTenantId),
           AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
-      //Not an exhaustive list of credits which will occur.
 
       if (!missingCredits.isEmpty())
         logger.info("Missing credits: " + missingCredits);

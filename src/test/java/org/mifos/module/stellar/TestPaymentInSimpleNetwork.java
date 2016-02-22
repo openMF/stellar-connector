@@ -49,7 +49,7 @@ public class TestPaymentInSimpleNetwork {
   public static final String ASSET_CODE = "XXX";
   public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
   public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
-  public static final int MAX_PAY_WAIT = 30000;
+  public static final int PAY_WAIT = 20000;
 
   @Value("${local.server.port}")
   int bridgePort;
@@ -125,8 +125,7 @@ public class TestPaymentInSimpleNetwork {
         secondTenantId,
         ASSET_CODE, transferAmount);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-        MAX_PAY_WAIT,
+    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT,
         AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
 
     if (!missingCredits.isEmpty())
@@ -151,8 +150,7 @@ public class TestPaymentInSimpleNetwork {
         ASSET_CODE, transferAmount);
 
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-        MAX_PAY_WAIT,
+    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT,
         AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
 
     if (missingCredits.isEmpty())
@@ -177,8 +175,7 @@ public class TestPaymentInSimpleNetwork {
         ASSET_CODE, transferAmount);
 
     {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-          MAX_PAY_WAIT,
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT,
           AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
 
       if (!missingCredits.isEmpty())
@@ -194,8 +191,7 @@ public class TestPaymentInSimpleNetwork {
         ASSET_CODE, transferAmount);
 
     {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-          MAX_PAY_WAIT,
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*4,
           AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
           AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
           AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
@@ -229,8 +225,7 @@ public class TestPaymentInSimpleNetwork {
         firstTenantId,
         ASSET_CODE, doubleTransferAmount);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-        MAX_PAY_WAIT,
+    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*2,
         AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
         AccountListener.credit(firstTenantId, doubleTransferAmount, ASSET_CODE, secondTenantId),
         AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
@@ -280,7 +275,7 @@ public class TestPaymentInSimpleNetwork {
 
 
       final List<AccountListener.Credit> leftOverTransfers =
-          accountListener.waitForCredits(MAX_PAY_WAIT*2, transfers);
+          accountListener.waitForCredits(PAY_WAIT *5, transfers);
 
       if (!leftOverTransfers.isEmpty())
         logger.info("Not all transfers completed.");
@@ -306,7 +301,7 @@ public class TestPaymentInSimpleNetwork {
       transfers.add(AccountListener.credit(secondTenantId, lastBit, ASSET_CODE, firstTenantId));
 
       final List<AccountListener.Credit> leftOverTransfers
-          = accountListener.waitForCredits(MAX_PAY_WAIT * 2, transfers);
+          = accountListener.waitForCredits(PAY_WAIT * 5, transfers);
 
       if (!leftOverTransfers.isEmpty())
         logger.info("Not all transfers completed.");
@@ -319,7 +314,7 @@ public class TestPaymentInSimpleNetwork {
     //Now try to go over the credit limit.
     makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE, lastBit);
 
-    accountListener.waitForCredits(MAX_PAY_WAIT,
+    accountListener.waitForCredits(PAY_WAIT,
         AccountListener.credit(secondTenantId, lastBit, ASSET_CODE, firstTenantId));
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
