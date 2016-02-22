@@ -26,12 +26,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.stellar.sdk.Asset;
 import org.stellar.sdk.requests.EventListener;
-import org.stellar.sdk.responses.operations.OperationResponse;
-import org.stellar.sdk.responses.operations.PathPaymentOperationResponse;
-import org.stellar.sdk.responses.operations.PaymentOperationResponse;
+import org.stellar.sdk.responses.effects.AccountCreditedEffectResponse;
+import org.stellar.sdk.responses.effects.AccountDebitedEffectResponse;
+import org.stellar.sdk.responses.effects.EffectResponse;
 
 @Component
-public class HorizonServerPaymentListener implements EventListener<OperationResponse> {
+public class HorizonServerEffectsListener implements EventListener<EffectResponse> {
 
   private final AccountBridgeRepository accountBridgeRepository;
   private final StellarCursorRepository stellarCursorRepository;
@@ -39,8 +39,7 @@ public class HorizonServerPaymentListener implements EventListener<OperationResp
   private final Logger logger;
 
 
-  @Autowired
-  HorizonServerPaymentListener(
+  @Autowired HorizonServerEffectsListener(
       final AccountBridgeRepository accountBridgeRepository,
       final StellarCursorRepository stellarCursorRepository,
       final HorizonServerUtilities horizonServerUtilities,
@@ -52,7 +51,7 @@ public class HorizonServerPaymentListener implements EventListener<OperationResp
     this.logger = logger;
   }
 
-  @Override public void onEvent(final OperationResponse operation) {
+  @Override public void onEvent(final EffectResponse operation) {
     final String pagingToken = operation.getPagingToken();
 
     final StellarCursorPersistency cursorPersistency = markPlace(pagingToken);
@@ -77,44 +76,47 @@ public class HorizonServerPaymentListener implements EventListener<OperationResp
     return stellarCursorRepository.save(new StellarCursorPersistency(pagingToken));
   }
 
-  private void handleOperation(final OperationResponse operation) {
+  private void handleOperation(final EffectResponse effect) {
 
-    if (operation instanceof PaymentOperationResponse)
+    if (effect instanceof AccountCreditedEffectResponse)
     {
-      final PaymentOperationResponse paymentOperation = (PaymentOperationResponse) operation;
+      final AccountCreditedEffectResponse accountCreditedEffect = (AccountCreditedEffectResponse) effect;
       final AccountBridgePersistency toAccount
-          = accountBridgeRepository.findByStellarAccountId(paymentOperation.getTo().getAccountId());
+          = accountBridgeRepository.findByStellarAccountId(effect.getAccount().getAccountId());
       if (toAccount == null)
         return; //Nothing to do.  Not one of ours.
 
-      final String amount = paymentOperation.getAmount();
-      final Asset asset = paymentOperation.getAsset();
-      final String assetCode = HorizonServerUtilities.getAssetCode(asset);
+      final String amount = accountCreditedEffect.getAmount();
+      final Asset asset = accountCreditedEffect.getAsset();
+      final String assetCode = StellarAccountHelpers.getAssetCode(asset);
+      final String issuer = StellarAccountHelpers.getIssuer(asset);
 
-      logger.info("Payment to {} from {} of {}, in currency {}",
-          toAccount.getMifosTenantId(), paymentOperation.getFrom().getAccountId(), amount, assetCode);
+      logger.info("Credit to {} of {}, in currency {}@{}",
+          toAccount.getMifosTenantId(), amount, assetCode, issuer);
 
       horizonServerUtilities.adjustOffer(toAccount.getStellarAccountPrivateKey(),
           StellarAccountId.mainAccount(toAccount.getStellarVaultAccountId()), asset);
 
       //TODO: let mifos know about the money.
       //TODO: This is a very slow approach.  Better would be to wait for multiple operations, and adjust just once.
+      //TODO: In case stellar transaction fails, should not be throwing runtime exceptions back at stellar.
     }
-    else if (operation instanceof PathPaymentOperationResponse)
+    else if (effect instanceof AccountDebitedEffectResponse)
     {
-      final PathPaymentOperationResponse pathPaymentOperation = (PathPaymentOperationResponse)operation;
+      final AccountDebitedEffectResponse accountDebitedEffect = (AccountDebitedEffectResponse)effect;
 
-      final AccountBridgePersistency toAccount
-          = accountBridgeRepository.findByStellarAccountId(pathPaymentOperation.getTo().getAccountId());
+      final AccountBridgePersistency toAccount = accountBridgeRepository
+          .findByStellarAccountId(accountDebitedEffect.getAccount().getAccountId());
       if (toAccount == null)
         return; //Nothing to do.  Not one of ours.
 
-      final String amount = pathPaymentOperation.getAmount();
-      final Asset asset = pathPaymentOperation.getAsset();
-      final String assetCode = HorizonServerUtilities.getAssetCode(asset);
+      final String amount = accountDebitedEffect.getAmount();
+      final Asset asset = accountDebitedEffect.getAsset();
+      final String assetCode = StellarAccountHelpers.getAssetCode(asset);
+      final String issuer = StellarAccountHelpers.getIssuer(asset);
 
-      logger.info("Path payment to {} from {} of {}, in currency {}",
-          toAccount.getMifosTenantId(), pathPaymentOperation.getFrom().getAccountId(), amount, assetCode);
+      logger.info("Debit to {} of {}, in currency {}@{}",
+          toAccount.getMifosTenantId(), amount, assetCode, issuer);
 
       horizonServerUtilities.adjustOffer(toAccount.getStellarAccountPrivateKey(),
           StellarAccountId.mainAccount(toAccount.getStellarVaultAccountId()), asset);
@@ -123,7 +125,7 @@ public class HorizonServerPaymentListener implements EventListener<OperationResp
     }
     else
     {
-      logger.info("Payment operation of type {}", operation.getType());
+      logger.info("Effect of type {}", effect.getType());
     }
   }
 }

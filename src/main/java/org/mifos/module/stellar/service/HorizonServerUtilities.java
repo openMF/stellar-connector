@@ -40,16 +40,9 @@ import static org.mifos.module.stellar.service.StellarAccountHelpers.*;
 
 @Component
 public class HorizonServerUtilities {
-  static String getAssetCode(final Asset asset) {
-    if (asset instanceof AssetTypeCreditAlphaNum)
-    {
-      return ((AssetTypeCreditAlphaNum)asset).getCode();
-    }
-    else
-    {
-      return "XLM";
-    }
-  }
+  private static int STELLAR_MINIMUM_BALANCE = 20;
+  private static int VAULT_ACCOUNT_INITIAL_BALANCE = STELLAR_MINIMUM_BALANCE + 1;
+  //a transaction (for example to issue currency) costs 100 stroops. 10^-5 stellar.
 
   private final Logger logger;
 
@@ -62,7 +55,7 @@ public class HorizonServerUtilities {
   //TODO: keeping installationAccountPrivateKey as String? Should this be removed from memory?
 
   @Value("${stellar.new-account-initial-balance}")
-  private int initialBalance = 20;
+  private int initialBalance = STELLAR_MINIMUM_BALANCE;
 
   @Value("${stellar.local-federation-domain}")
   private String localFederationDomain;
@@ -71,6 +64,15 @@ public class HorizonServerUtilities {
   HorizonServerUtilities(@Qualifier("stellarBridgeLogger")final Logger logger)
   {
     this.logger = logger;
+
+    int STELLAR_TRUSTLINE_BALANCE_REQUIREMENT = 10;
+    int initialBalance = Math.max(this.initialBalance,
+        STELLAR_MINIMUM_BALANCE + STELLAR_TRUSTLINE_BALANCE_REQUIREMENT);
+    if (initialBalance != this.initialBalance) {
+      logger.info("Initial balance cannot be lower than 30.  Configured value is being ignored: %i",
+          this.initialBalance);
+    }
+    this.initialBalance = initialBalance;
   }
 
   @PostConstruct
@@ -81,7 +83,9 @@ public class HorizonServerUtilities {
 
   /**
    * Create an account on the stellar server to be used by a Mifos tenant.  This account will
-   * need a minimum initial balance of 20 lumens, to be derived from the installation account.
+   * need a minimum initial balance of 30 lumens, to be derived from the installation account.
+   * A higher minimum can be configured, and should be if more than one trustline is needed.
+   * A tenant-associated vault account uses up one trustline.
    *
    * @return The KeyPair of the account which was created.
    *
@@ -99,12 +103,32 @@ public class HorizonServerUtilities {
 
     final KeyPair newTenantStellarAccountKeyPair = KeyPair.random();
 
-    createAccountForKeyPair(newTenantStellarAccountKeyPair, installationAccountKeyPair,
+    createAccountForKeyPair(
+        initialBalance,
+        newTenantStellarAccountKeyPair,
+        installationAccountKeyPair,
         installationAccount);
 
     setOptionsForNewAccount(newTenantStellarAccountKeyPair, installationAccountKeyPair);
 
     return newTenantStellarAccountKeyPair;
+  }
+
+  public KeyPair createVaultAccount()
+    throws InvalidConfigurationException, StellarAccountCreationFailedException {
+
+    final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
+    final AccountResponse installationAccount = getAccount(installationAccountKeyPair);
+
+    final KeyPair newTenantStellarVaultAccountKeyPair = KeyPair.random();
+
+    createAccountForKeyPair(
+        VAULT_ACCOUNT_INITIAL_BALANCE,
+        newTenantStellarVaultAccountKeyPair,
+        installationAccountKeyPair,
+        installationAccount);
+
+    return newTenantStellarVaultAccountKeyPair;
   }
 
   /**
@@ -303,21 +327,11 @@ public class HorizonServerUtilities {
     return offerOperationBuilder.build();
   }
 
-
-
-  private void createAccountForKeyPair(
-      final KeyPair newAccountKeyPair,
-      final KeyPair installationAccountKeyPair,
-      final AccountResponse installationAccount)
+  private void createAccountForKeyPair(final int initialBalance, final KeyPair newAccountKeyPair,
+      final KeyPair installationAccountKeyPair, final AccountResponse installationAccount)
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final Transaction.Builder transactionBuilder = new Transaction.Builder(installationAccount);
-
-    int initialBalance = Math.max(this.initialBalance, 20);
-    if (initialBalance != this.initialBalance) {
-      logger.info("Initial balance cannot be lower than 20.  Configured value is being ignored: %i",
-          this.initialBalance);
-    }
 
     final CreateAccountOperation createAccountOperation =
         new CreateAccountOperation.Builder(newAccountKeyPair,
@@ -470,6 +484,10 @@ public class HorizonServerUtilities {
           server.submitTransaction(transaction);
       if (!transactionResponse.isSuccess())
       {
+        logger.info("Stellar transaction failed, request: {}",
+            transactionResponse.getExtras().getEnvelopeXdr());
+        logger.info("Stellar transaction failed, response: {}",
+            transactionResponse.getExtras().getResultXdr());
         //TODO: resend transaction if you get a bad sequence.
         throw failureHandler.exceptionWhenTransactionFails();
       }

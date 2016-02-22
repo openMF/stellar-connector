@@ -17,6 +17,7 @@ package org.mifos.module.stellar.service;
 
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.stellar.sdk.Asset;
+import org.stellar.sdk.AssetTypeCreditAlphaNum;
 import org.stellar.sdk.AssetTypeNative;
 import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.responses.AccountResponse;
@@ -138,5 +139,27 @@ class StellarAccountHelpers {
             (numericAspect.apply(balance2)))
         .map(StellarAccountHelpers::getAssetOfBalance)
         .collect(Collectors.toSet());
+  }
+
+  static String getAssetCode(final Asset asset) {
+    if (asset instanceof AssetTypeCreditAlphaNum)
+    {
+      return ((AssetTypeCreditAlphaNum)asset).getCode();
+    }
+    else
+    {
+      return "XLM";
+    }
+  }
+
+  public static String getIssuer(Asset asset) {
+    if (asset instanceof AssetTypeCreditAlphaNum)
+    {
+      return ((AssetTypeCreditAlphaNum)asset).getIssuer().getAccountId();
+    }
+    else
+    {
+      return "stellar";
+    }
   }
 }

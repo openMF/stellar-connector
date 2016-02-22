@@ -23,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.stellar.sdk.KeyPair;
-import org.stellar.sdk.requests.PaymentsRequestBuilder;
+import org.stellar.sdk.requests.EffectsRequestBuilder;
 
 import javax.annotation.PostConstruct;
 import java.net.URI;
@@ -36,14 +36,14 @@ public class HorizonServerPaymentObserver {
 
   private final AccountBridgeRepository accountBridgeRepository;
   private final StellarCursorRepository stellarCursorRepository;
-  private final HorizonServerPaymentListener listener;
+  private final HorizonServerEffectsListener listener;
 
   @PostConstruct
   void init()
   {
     final String cursor = getCurrentCursor();
 
-    accountBridgeRepository.findAll()
+    accountBridgeRepository.readAllByStellarVaultAccountIdNotNull()
         .forEach(bridge -> setupListeningForAccount(
                     StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
   }
@@ -52,7 +52,7 @@ public class HorizonServerPaymentObserver {
   HorizonServerPaymentObserver(
       final AccountBridgeRepository accountBridgeRepository,
       final StellarCursorRepository stellarCursorRepository,
-      final HorizonServerPaymentListener listener)
+      final HorizonServerEffectsListener listener)
   {
     this.accountBridgeRepository = accountBridgeRepository;
     this.stellarCursorRepository = stellarCursorRepository;
@@ -77,12 +77,12 @@ public class HorizonServerPaymentObserver {
   private void setupListeningForAccount(
       final StellarAccountId stellarAccountId, final String cursor)
   {
-    final PaymentsRequestBuilder paymentsRequestBuilder
-        = new PaymentsRequestBuilder(URI.create(serverAddress));
-    paymentsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
+    final EffectsRequestBuilder effectsRequestBuilder
+        = new EffectsRequestBuilder(URI.create(serverAddress));
+    effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
     if (cursor != null)
-      paymentsRequestBuilder.cursor(cursor);
+      effectsRequestBuilder.cursor(cursor);
 
-    paymentsRequestBuilder.stream(listener);
+    effectsRequestBuilder.stream(listener);
   }
 }

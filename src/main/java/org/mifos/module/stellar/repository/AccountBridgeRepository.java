@@ -20,9 +20,12 @@ import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.stream.Stream;
+
 @Repository
 public interface AccountBridgeRepository
     extends CrudRepository<AccountBridgePersistency, Long> {
   AccountBridgePersistency findByMifosTenantId(final String mifosTenantId);
   AccountBridgePersistency findByStellarAccountId(final String stellarAccountId);
+  Stream<AccountBridgePersistency> readAllByStellarVaultAccountIdNotNull();
 }
