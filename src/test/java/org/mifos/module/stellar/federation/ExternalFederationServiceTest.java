@@ -21,6 +21,7 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.stellar.sdk.federation.MalformedAddressException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,10 +33,19 @@ import static org.junit.Assert.assertFalse;
 
 @RunWith(Parameterized.class)
 public class ExternalFederationServiceTest {
+  enum AddressDomainAccessBehaviorEnum
+  {
+    CONNECTION_FAILS,
+    ADDRESS_IS_MALFORMED,
+    EXTERNAL_FEDERATION_RETURNS_NULL,
+    SUCCESS
+  }
+
   private static class TestCase {
     private String inputtedStellarAddress = null;
 
-    public boolean addressDomainAccessFails = false;
+    public AddressDomainAccessBehaviorEnum addressDomainAccessBehavior =
+        AddressDomainAccessBehaviorEnum.SUCCESS;
 
     private String outputtedMemoType = "";
     private String outputtedMemo = "";
@@ -51,8 +61,8 @@ public class ExternalFederationServiceTest {
       return this;
     }
 
-    TestCase addressDomainAccessFails(final boolean value) {
-      this.addressDomainAccessFails = value;
+    TestCase addressDomainAccessBehavior(final AddressDomainAccessBehaviorEnum newVal) {
+      this.addressDomainAccessBehavior = newVal;
       return this;
     }
 
@@ -126,7 +136,31 @@ public class ExternalFederationServiceTest {
 
     ret.add(new TestCase()
         .inputtedStellarAddress("x*x.org")
-        .addressDomainAccessFails(true) //Can happen if there's nothing at that URL (for example).
+        .addressDomainAccessBehavior(AddressDomainAccessBehaviorEnum.CONNECTION_FAILS)
+        //Can happen if there's nothing at that URL (for example).
+        .exceptionExpected(true)
+    );
+
+    ret.add(new TestCase()
+        .inputtedStellarAddress("x*x.org")
+        .addressDomainAccessBehavior(AddressDomainAccessBehaviorEnum.ADDRESS_IS_MALFORMED)
+        //Can happen if there's nothing at that URL (for example).
+        .exceptionExpected(true)
+    );
+
+    ret.add(new TestCase()
+        .inputtedStellarAddress("x*x.org")
+        .expectedPublicKey(null)
+        //Can happen if there's nothing at that URL (for example).
+        .exceptionExpected(true)
+    );
+
+
+    ret.add(new TestCase()
+        .inputtedStellarAddress("x*x.org")
+        .addressDomainAccessBehavior(
+            AddressDomainAccessBehaviorEnum.EXTERNAL_FEDERATION_RETURNS_NULL)
+        //Can happen if there's nothing at that URL (for example).
         .exceptionExpected(true)
     );
 
@@ -160,7 +194,8 @@ public class ExternalFederationServiceTest {
   private void checkTestCaseConsistency() {
     final String INCOMPLETE = "Testcase initialization incomplete";
     assertFalse(INCOMPLETE, testCase.inputtedStellarAddress == null);
-    if (!testCase.addressDomainAccessFails && !testCase.exceptionExpected) {
+    if (testCase.addressDomainAccessBehavior != AddressDomainAccessBehaviorEnum.SUCCESS
+        && !testCase.exceptionExpected) {
       assertFalse(INCOMPLETE, testCase.expectedPublicKey == null);
     }
   }
@@ -180,14 +215,23 @@ public class ExternalFederationServiceTest {
       } catch (IOException e1) {
         assertFalse("An IOException should never be thrown here in the test.", true);
       }
-      if (!testCase.addressDomainAccessFails) {
-        will(returnValue(
-            new org.stellar.sdk.federation.FederationResponse(
-                testCase.inputtedStellarAddress, testCase.expectedPublicKey,
-                testCase.outputtedMemoType, testCase.outputtedMemo)));
-      }
-      else {
-        will(throwException(new IOException()));
+      switch (testCase.addressDomainAccessBehavior) {
+        case SUCCESS:
+          will(returnValue(
+              new org.stellar.sdk.federation.FederationResponse(
+                  testCase.inputtedStellarAddress, testCase.expectedPublicKey,
+                  testCase.outputtedMemoType, testCase.outputtedMemo)));
+          break;
+        case CONNECTION_FAILS:
+          will(throwException(new IOException()));
+          break;
+        case ADDRESS_IS_MALFORMED:
+          will(throwException(new MalformedAddressException()));
+          break;
+        case EXTERNAL_FEDERATION_RETURNS_NULL:
+          will(returnValue(null));
+        default:
+          break;
       }
     }});
     return externalCallsMock;

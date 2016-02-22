@@ -17,6 +17,7 @@ package org.mifos.module.stellar.federation;
 
 import com.google.common.net.InternetDomainName;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -89,6 +90,22 @@ public class StellarAddress {
       isVaultAddress = false;
       this.userAccountId = userAccountId;
     }
+  }
+
+  @Override public boolean equals(Object o) {
+    if (this == o)
+      return true;
+    if (!(o instanceof StellarAddress))
+      return false;
+    StellarAddress that = (StellarAddress) o;
+    return isVaultAddress == that.isVaultAddress &&
+        Objects.equals(domain, that.domain) &&
+        Objects.equals(tenantName, that.tenantName) &&
+        Objects.equals(userAccountId, that.userAccountId);
+  }
+
+  @Override public int hashCode() {
+    return Objects.hash(domain, tenantName, userAccountId, isVaultAddress);
   }
 
   public String toString() {

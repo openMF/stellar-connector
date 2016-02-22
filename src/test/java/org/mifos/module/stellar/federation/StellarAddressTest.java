@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 @RunWith(Parameterized.class)
 public class StellarAddressTest {
@@ -180,6 +181,18 @@ public class StellarAddressTest {
       assertEquals(testCase.getExpectedTenantName(), result.getTenantName());
       assertEquals(testCase.getExpectedUserAccountId(), result.getUserAccountId());
       assertEquals(testCase.getExpectedVaultAddress(), result.isVaultAddress());
+
+      if (!testCase.getExpectedVaultAddress() && !testCase.getExpectedUserAccountId().isPresent())
+      {
+        final StellarAddress comparison = StellarAddress
+            .forTenant(testCase.getExpectedTenantName(),
+                testCase.getExpectedDomain().toString());
+
+        assertEquals(comparison, result);
+        assertEquals(result, result);
+        assertNotEquals(result, new String());
+        assertEquals(comparison.hashCode(), result.hashCode());
+      }
 
       assertEquals(testCase.getInputedStringAddress(), result.toString());
     }
