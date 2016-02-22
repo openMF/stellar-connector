@@ -19,7 +19,9 @@ import org.mifos.module.stellar.federation.FederationFailedException;
 import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.federation.StellarAddress;
+import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
+import org.mifos.module.stellar.repository.MifosEventRepository;
 import org.mifos.module.stellar.service.HorizonServerUtilities;
 import org.mifos.module.stellar.service.InvalidConfigurationException;
 import org.mifos.module.stellar.service.StellarAddressResolver;
@@ -31,10 +33,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
+
 @Component
 public class PaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
 
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
+  private final MifosEventRepository mifosEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
   private final Logger logger;
@@ -42,10 +47,12 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
   @Autowired
   public PaymentEventListener(
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
+      final MifosEventRepository mifosEventRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
+    this.mifosEventRepository = mifosEventRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
     this.logger = logger;
@@ -71,13 +78,23 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
     final char[] decodedStellarPrivateKey =
         accountBridgeRepositoryDecorator.getStellarAccountPrivateKey(paymentPayload.sourceTenantId);
 
-    horizonServerUtilities.findPathPay(
-        targetAccountId,
-        paymentPayload.amount, paymentPayload.assetCode,
-        decodedStellarPrivateKey);
+
+    final MifosEventPersistency eventSource = this.mifosEventRepository.findOne(event.getEventId());
+    try {
+      horizonServerUtilities.findPathPay(
+          targetAccountId,
+          paymentPayload.amount, paymentPayload.assetCode,
+          decodedStellarPrivateKey);
+      eventSource.setProcessed(Boolean.TRUE);
+      logger.info("Horizon payment processed.");
+    } catch (InvalidConfigurationException | StellarPaymentFailedException ex) {
+      eventSource.setProcessed(Boolean.FALSE);
+      eventSource.setErrorMessage(ex.getMessage());
+    }
+    eventSource.setLastModifiedOn(new Date());
+    this.mifosEventRepository.save(eventSource);
 
     //TODO: find appropriate currency for source and target.
     //TODO: adjust mifos balance
-    //TODO: Mark event as processed
   }
 }

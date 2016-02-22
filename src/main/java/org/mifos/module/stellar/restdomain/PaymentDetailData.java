@@ -20,7 +20,8 @@ public class PaymentDetailData {
   //private PaymentTypeData paymentType;
   public String accountNumber;
   //private String checkNumber;
-  //private String routingCode;
+  public String routingCode;
+  //TODO: check that routingCode is Stellar.
   //private String receiptNumber;
   public String bankNumber;
 }

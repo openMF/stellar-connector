@@ -191,7 +191,7 @@ public class TestPaymentInSimpleNetwork {
         ASSET_CODE, transferAmount);
 
     {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*4,
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*2,
           AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
           AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
           AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
@@ -321,6 +321,13 @@ public class TestPaymentInSimpleNetwork {
         TRUST_LIMIT);
   }
 
+  //TODO: test transferring to a user account.
+  //TODO: add a test for transferring XLM.
+  //TODO: add a test with enough pages to provoke paging.
+  //TODO: add a test for installation balance.
+  //TODO: add a test for simple balance.
+  //TODO: add a test with a mock for external federation containing external domain addresses.
+  //TODO: add a test which pays to an invalid stellar address.
   //TODO: still needed a test which stops and starts the bridge component, but makes transactions
   //TODO: against Stellar while the bridge component is down.
 }

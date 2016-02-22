@@ -82,4 +82,6 @@ public class FederationServerController {
       @SuppressWarnings("unused") final FederationFailedException ex) {
     return ex.getMessage();
   }
+
+  //TODO: create federation integration test.
 }

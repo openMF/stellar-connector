@@ -32,6 +32,9 @@ public class MifosEventPersistency {
   @Column(name = "processed")
   private Boolean processed;
 
+  @Column(name = "outstanding_retries")
+  private Integer outstandingRetries;
+
   @Column(name = "error_message")
   private String errorMessage;
 
@@ -56,39 +59,51 @@ public class MifosEventPersistency {
     return payload;
   }
 
-  public void setPayload(String payload) {
+  public void setPayload(final String payload) {
     this.payload = payload;
   }
 
+  @SuppressWarnings("unused")
   public Boolean getProcessed() {
     return processed;
   }
 
-  public void setProcessed(Boolean processed) {
+  public void setProcessed(final Boolean processed) {
     this.processed = processed;
   }
 
+  public Integer getOutstandingRetries() {
+    return outstandingRetries;
+  }
+
+  public void setOutstandingRetries(final Integer outstandingRetries) {
+    this.outstandingRetries = outstandingRetries;
+  }
+
+  @SuppressWarnings("unused")
   public String getErrorMessage() {
     return errorMessage;
   }
 
-  public void setErrorMessage(String errorMessage) {
+  public void setErrorMessage(final String errorMessage) {
     this.errorMessage = errorMessage;
   }
 
+  @SuppressWarnings("unused")
   public Date getCreatedOn() {
     return createdOn;
   }
 
-  public void setCreatedOn(Date createdOn) {
+  public void setCreatedOn(final Date createdOn) {
     this.createdOn = createdOn;
   }
 
+  @SuppressWarnings("unused")
   public Date getLastModifiedOn() {
     return lastModifiedOn;
   }
 
-  public void setLastModifiedOn(Date lastModifiedOn) {
+  public void setLastModifiedOn(final Date lastModifiedOn) {
     this.lastModifiedOn = lastModifiedOn;
   }
 }
