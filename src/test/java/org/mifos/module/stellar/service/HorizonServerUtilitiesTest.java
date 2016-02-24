@@ -13,16 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.repository;
+package org.mifos.module.stellar.service;
 
+import org.junit.Assert;
+import org.junit.Test;
 
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.stereotype.Repository;
+import java.math.BigDecimal;
 
-@Repository()
-public interface AccountBridgeRepository
-    extends CrudRepository<AccountBridgePersistency, Long> {
-  AccountBridgePersistency findByMifosTenantId(final String mifosTenantId);
-  AccountBridgePersistency findByStellarAccountId(final String stellarAccountId);
+public class HorizonServerUtilitiesTest {
+  @Test
+  public void determineOfferAmount()
+  {
+    final BigDecimal offerAmount = HorizonServerUtilities
+        .determineOfferAmount(BigDecimal.valueOf(20), BigDecimal.valueOf(10),
+            BigDecimal.valueOf(15));
+    Assert.assertTrue(offerAmount.compareTo(BigDecimal.TEN) == 0);
+  }
 }

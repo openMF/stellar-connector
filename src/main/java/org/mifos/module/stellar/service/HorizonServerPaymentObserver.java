@@ -43,7 +43,7 @@ public class HorizonServerPaymentObserver {
   {
     final String cursor = getCurrentCursor();
 
-    accountBridgeRepository.readAllByStellarVaultAccountIdNotNull()
+    accountBridgeRepository.findAll()
         .forEach(bridge -> setupListeningForAccount(
                     StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
   }
@@ -62,7 +62,7 @@ public class HorizonServerPaymentObserver {
 
   void setupListeningForAccount(final StellarAccountId stellarAccountId)
   {
-    setupListeningForAccount(stellarAccountId, null);
+    setupListeningForAccount(stellarAccountId, getCurrentCursor());
   }
 
   private String getCurrentCursor() {
@@ -80,8 +80,7 @@ public class HorizonServerPaymentObserver {
     final EffectsRequestBuilder effectsRequestBuilder
         = new EffectsRequestBuilder(URI.create(serverAddress));
     effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
-    if (cursor != null)
-      effectsRequestBuilder.cursor(cursor);
+    effectsRequestBuilder.cursor(cursor);
 
     effectsRequestBuilder.stream(listener);
   }

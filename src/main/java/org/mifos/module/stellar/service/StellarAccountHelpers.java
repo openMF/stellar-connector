@@ -28,35 +28,32 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 class StellarAccountHelpers {
-  static BigDecimal getBalanceOfAsset(
-      final AccountResponse sourceAccount,
-      final Asset asset)
-  {
-    return getNumericAspectOfAsset(sourceAccount, asset,
-        balance -> stellarBalanceToBigDecimal(balance.getBalance()));
+  static String getAssetCode(final Asset asset) {
+    if (asset instanceof AssetTypeCreditAlphaNum)
+    {
+      return ((AssetTypeCreditAlphaNum)asset).getCode();
+    }
+    else
+    {
+      return "XLM";
+    }
   }
 
-  static BigDecimal getNumericAspectOfAsset(
-      final AccountResponse sourceAccount,
-      final Asset asset,
-      final Function<AccountResponse.Balance, BigDecimal> aspect)
-  {
-    final Optional<BigDecimal> balanceOfGivenAsset
-        = Arrays.asList(sourceAccount.getBalances()).stream()
-        .filter(balance -> getAssetOfBalance(balance).equals(asset))
-        .map(aspect)
-        .max(BigDecimal::compareTo);
-
-    //Theoretically there shouldn't be more than one balance, but if this should turn out to be
-    //incorrect, we return the largest one, rather than adding them together.
-
-    return balanceOfGivenAsset.orElse(BigDecimal.ZERO);
+  static String getIssuer(final Asset asset) {
+    if (asset instanceof AssetTypeCreditAlphaNum)
+    {
+      return ((AssetTypeCreditAlphaNum)asset).getIssuer().getAccountId();
+    }
+    else
+    {
+      return "stellar";
+    }
   }
 
-  static boolean balanceIsInAsset(
-      final AccountResponse.Balance balance, final String assetCode)
+  static boolean balanceIsInAsset(final AccountResponse.Balance balance, final String assetCode)
   {
     if (balance.getAssetType() == null)
       return false;
@@ -68,8 +65,7 @@ class StellarAccountHelpers {
     return balance.getAssetCode().equals(assetCode);
   }
 
-  static Asset getAssetOfBalance(
-      final AccountResponse.Balance balance)
+  static Asset getAssetOfBalance(final AccountResponse.Balance balance)
   {
     if (balance.getAssetCode() == null)
       return new AssetTypeNative();
@@ -93,8 +89,48 @@ class StellarAccountHelpers {
     return Asset.createNonNativeAsset(assetCode, KeyPair.fromAccountId(targetIssuer.getPublicKey()));
   }
 
-  static BigDecimal getBalance(final AccountResponse tenantAccount, final String assetCode) {
-    final AccountResponse.Balance[] balances = tenantAccount.getBalances();
+  static BigDecimal remainingTrustInBalance(final AccountResponse.Balance balance)
+  {
+    return stellarBalanceToBigDecimal(balance.getLimit())
+        .subtract(stellarBalanceToBigDecimal(balance.getBalance()));
+  }
+
+  private final AccountResponse account;
+
+  StellarAccountHelpers(final AccountResponse account)
+  {
+    this.account = account;
+  }
+
+  AccountResponse get()
+  {
+    return account;
+  }
+
+  BigDecimal getBalanceOfAsset(final Asset asset)
+  {
+    return getNumericAspectOfAsset(asset,
+        balance -> stellarBalanceToBigDecimal(balance.getBalance()));
+  }
+
+  BigDecimal getNumericAspectOfAsset(
+      final Asset asset,
+      final Function<AccountResponse.Balance, BigDecimal> aspect)
+  {
+    final Optional<BigDecimal> balanceOfGivenAsset
+        = Arrays.asList(account.getBalances()).stream()
+        .filter(balance -> getAssetOfBalance(balance).equals(asset))
+        .map(aspect)
+        .max(BigDecimal::compareTo);
+
+    //Theoretically there shouldn't be more than one balance, but if this should turn out to be
+    //incorrect, we return the largest one, rather than adding them together.
+
+    return balanceOfGivenAsset.orElse(BigDecimal.ZERO);
+  }
+
+  BigDecimal getBalance(final String assetCode) {
+    final AccountResponse.Balance[] balances = account.getBalances();
 
     return Arrays.asList(balances).stream()
         .filter(balance -> balanceIsInAsset(balance, assetCode))
@@ -102,32 +138,23 @@ class StellarAccountHelpers {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
-  static Set<Asset> findAssetsWithBalance(
-      final AccountResponse account,
+  Set<Asset> findAssetsWithBalance(
       final BigDecimal amount,
       final String assetCode) {
 
-    return findAssetsWithAspect(account, amount, assetCode,
+    return findAssetsWithAspect(amount, assetCode,
         balance -> stellarBalanceToBigDecimal(balance.getBalance()));
   }
 
-  static Set<Asset> findAssetsWithTrust(
-      final AccountResponse account,
+  Set<Asset> findAssetsWithTrust(
       final BigDecimal amount,
       final String assetCode) {
 
-    return findAssetsWithAspect(account, amount, assetCode,
+    return findAssetsWithAspect(amount, assetCode,
         StellarAccountHelpers::remainingTrustInBalance);
   }
 
-  static BigDecimal remainingTrustInBalance(final AccountResponse.Balance balance)
-  {
-    return stellarBalanceToBigDecimal(balance.getLimit())
-        .subtract(stellarBalanceToBigDecimal(balance.getBalance()));
-  }
-
-  private static Set<Asset> findAssetsWithAspect(
-      final AccountResponse account,
+  private Set<Asset> findAssetsWithAspect(
       final BigDecimal amount,
       final String assetCode,
       final Function<AccountResponse.Balance, BigDecimal> numericAspect)
@@ -141,25 +168,19 @@ class StellarAccountHelpers {
         .collect(Collectors.toSet());
   }
 
-  static String getAssetCode(final Asset asset) {
-    if (asset instanceof AssetTypeCreditAlphaNum)
-    {
-      return ((AssetTypeCreditAlphaNum)asset).getCode();
-    }
-    else
-    {
-      return "XLM";
-    }
+  Stream<AccountResponse.Balance> getBalancesStream(final String assetCode, final Asset vaultAsset)
+  {
+    return Arrays.asList(account.getBalances()).stream()
+        .filter(balance -> balanceIsInAsset(balance, assetCode))
+        .filter(balance -> !getAssetOfBalance(balance).equals(vaultAsset));
   }
 
-  public static String getIssuer(Asset asset) {
-    if (asset instanceof AssetTypeCreditAlphaNum)
-    {
-      return ((AssetTypeCreditAlphaNum)asset).getIssuer().getAccountId();
-    }
-    else
-    {
-      return "stellar";
-    }
+  public BigDecimal getRemainingTrustInAsset(final Asset asset) {
+    return getTrustInAsset(asset).subtract(getBalanceOfAsset(asset));
+  }
+
+  public BigDecimal getTrustInAsset(final Asset asset) {
+    return getNumericAspectOfAsset(asset,
+        balance -> stellarBalanceToBigDecimal(balance.getLimit()));
   }
 }

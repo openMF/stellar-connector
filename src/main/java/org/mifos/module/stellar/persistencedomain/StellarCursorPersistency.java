@@ -33,6 +33,9 @@ public class StellarCursorPersistency {
   @Column(name = "processed")
   private Boolean processed;
 
+  @SuppressWarnings("unused")
+  public StellarCursorPersistency() { }
+
   public StellarCursorPersistency(final String cursor) {
     this.cursor = cursor;
     this.processed = false;

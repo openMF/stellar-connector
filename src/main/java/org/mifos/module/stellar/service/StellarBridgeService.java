@@ -79,6 +79,9 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
   {
     final KeyPair accountKeyPair = horizonServerUtilities.createAccount();
 
+    horizonServerPaymentObserver.setupListeningForAccount(
+        StellarAccountId.mainAccount(accountKeyPair.getAccountId()));
+
     this.accountBridgeRepositoryDecorator.save(
         mifosTenantId, mifosToken, accountKeyPair);
   }
@@ -314,9 +317,6 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
     final KeyPair newStellarVaultKeyPair = horizonServerUtilities.createVaultAccount();
     accountBridgeRepositoryDecorator.addStellarVaultAccount(
         bridge.getMifosTenantId(), newStellarVaultKeyPair);
-
-    horizonServerPaymentObserver.setupListeningForAccount(
-        StellarAccountId.mainAccount(bridge.getStellarAccountId()));
 
     return newStellarVaultKeyPair;
   }
