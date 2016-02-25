@@ -19,11 +19,13 @@ import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.stream.Stream;
+
 
 @Repository
 public interface StellarCursorRepository extends CrudRepository<StellarCursorPersistency, Long> {
   StellarCursorPersistency findByCursor(String pagingToken);
-  StellarCursorPersistency findByProcessedTrueOrderByIdDesc();
+  Stream<StellarCursorPersistency> findByProcessedTrueOrderByIdDesc();
   void deleteByProcessedTrue();
 
 }

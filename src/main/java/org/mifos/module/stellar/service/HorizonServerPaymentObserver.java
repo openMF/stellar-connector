@@ -27,6 +27,7 @@ import org.stellar.sdk.requests.EffectsRequestBuilder;
 
 import javax.annotation.PostConstruct;
 import java.net.URI;
+import java.util.Optional;
 
 @Component
 public class HorizonServerPaymentObserver {
@@ -41,7 +42,7 @@ public class HorizonServerPaymentObserver {
   @PostConstruct
   void init()
   {
-    final String cursor = getCurrentCursor();
+    final Optional<String> cursor = getCurrentCursor();
 
     accountBridgeRepository.findAll()
         .forEach(bridge -> setupListeningForAccount(
@@ -65,22 +66,23 @@ public class HorizonServerPaymentObserver {
     setupListeningForAccount(stellarAccountId, getCurrentCursor());
   }
 
-  private String getCurrentCursor() {
-    final StellarCursorPersistency cursorPersistency
-        = stellarCursorRepository.findByProcessedTrueOrderByIdDesc();
-    if (cursorPersistency == null)
-      return null;
+  private Optional<String> getCurrentCursor() {
+    final Optional<StellarCursorPersistency> cursorPersistency
+        = stellarCursorRepository.findByProcessedTrueOrderByIdDesc().findFirst();
+    if (!cursorPersistency.isPresent())
+      return Optional.empty();
     else
-      return cursorPersistency.getCursor();
+      return Optional.of(cursorPersistency.get().getCursor());
   }
 
   private void setupListeningForAccount(
-      final StellarAccountId stellarAccountId, final String cursor)
+      final StellarAccountId stellarAccountId, final Optional<String> cursor)
   {
     final EffectsRequestBuilder effectsRequestBuilder
         = new EffectsRequestBuilder(URI.create(serverAddress));
     effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
-    effectsRequestBuilder.cursor(cursor);
+    if (cursor.isPresent())
+      effectsRequestBuilder.cursor(cursor.get());
 
     effectsRequestBuilder.stream(listener);
   }
