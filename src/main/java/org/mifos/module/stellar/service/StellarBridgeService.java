@@ -33,6 +33,7 @@ import java.util.Date;
 
 @Service
 public class StellarBridgeService implements ApplicationEventPublisherAware {
+  private static final Integer PAYMENT_PROCESSING_MAXIMUM_RETRY_COUNT = 3;
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
   private ApplicationEventPublisher eventPublisher;
   private final MifosEventRepository mifosEventRepository;
@@ -162,6 +163,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
     final Date now = new Date();
     eventSource.setCreatedOn(now);
     eventSource.setLastModifiedOn(now);
+    eventSource.setOutstandingRetries(PAYMENT_PROCESSING_MAXIMUM_RETRY_COUNT);
 
     return this.mifosEventRepository.save(eventSource).getId();
   }

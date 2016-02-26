@@ -27,6 +27,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.SimpleApplicationEventMulticaster;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
 @EnableAutoConfiguration
@@ -43,6 +45,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     "org.mifos.module.stellar.repository",
     "org.mifos.module.stellar.federation"
 })
+@EnableAsync
+@EnableScheduling
 public class MifosStellarBridgeConfiguration {
   @Bean
   public SimpleApplicationEventMulticaster applicationEventMulticaster() {

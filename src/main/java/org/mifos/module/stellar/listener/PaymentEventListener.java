@@ -22,11 +22,8 @@ import org.mifos.module.stellar.federation.StellarAddress;
 import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.repository.MifosEventRepository;
-import org.mifos.module.stellar.service.HorizonServerUtilities;
-import org.mifos.module.stellar.service.InvalidConfigurationException;
-import org.mifos.module.stellar.service.StellarAddressResolver;
+import org.mifos.module.stellar.service.*;
 import org.mifos.module.stellar.repository.AccountBridgeRepositoryDecorator;
-import org.mifos.module.stellar.service.StellarPaymentFailedException;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -43,6 +40,8 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
   private final Logger logger;
+  private final ValueSynchronizer<Long> retrySynchronizer;
+
 
   @Autowired
   public PaymentEventListener(
@@ -56,45 +55,69 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
     this.logger = logger;
+    this.retrySynchronizer = new ValueSynchronizer<>();
   }
 
   @Override public void onApplicationEvent(final MifosPaymentEvent event)
       throws InvalidStellarAddressException, FederationFailedException,
       InvalidConfigurationException, StellarPaymentFailedException
   {
-    final PaymentPersistency paymentPayload = event.getPayload();
-    final StellarAccountId targetAccountId;
-    try {
-      targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(
-          StellarAddress.forTenant(paymentPayload.targetAccount, paymentPayload.sinkDomain));
-    }
-    catch (final InvalidStellarAddressException | FederationFailedException ex)
+    retrySynchronizer.sync(event.getEventId(), () ->
     {
-      logger.error("Federation failed on the address: " + paymentPayload.targetAccount);
-      throw ex;
-      //TODO: decide what to do with the event.  Retry? In which cases?
-    }
+      final MifosEventPersistency eventSource = this.mifosEventRepository.findOne(event.getEventId());
 
-    final char[] decodedStellarPrivateKey =
-        accountBridgeRepositoryDecorator.getStellarAccountPrivateKey(paymentPayload.sourceTenantId);
+      final Integer outstandingRetries = eventSource.getOutstandingRetries();
+      final Boolean processed = eventSource.getProcessed();
+      if (processed || (outstandingRetries <= 0))
+        return;
 
+      eventSource.setOutstandingRetries(outstandingRetries - 1);
+      eventSource.setLastModifiedOn(new Date());
+      this.mifosEventRepository.save(eventSource);
 
-    final MifosEventPersistency eventSource = this.mifosEventRepository.findOne(event.getEventId());
-    try {
-      horizonServerUtilities.findPathPay(
-          targetAccountId,
-          paymentPayload.amount, paymentPayload.assetCode,
-          decodedStellarPrivateKey);
-      eventSource.setProcessed(Boolean.TRUE);
-      logger.info("Horizon payment processed.");
-    } catch (InvalidConfigurationException | StellarPaymentFailedException ex) {
-      eventSource.setProcessed(Boolean.FALSE);
-      eventSource.setErrorMessage(ex.getMessage());
-    }
-    eventSource.setLastModifiedOn(new Date());
-    this.mifosEventRepository.save(eventSource);
+      final PaymentPersistency paymentPayload = event.getPayload();
 
-    //TODO: find appropriate currency for source and target.
-    //TODO: adjust mifos balance
+      try {
+        final StellarAccountId targetAccountId;
+        targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(
+            StellarAddress.forTenant(paymentPayload.targetAccount, paymentPayload.sinkDomain));
+
+        final char[] decodedStellarPrivateKey =
+            accountBridgeRepositoryDecorator.getStellarAccountPrivateKey(paymentPayload.sourceTenantId);
+
+        horizonServerUtilities.findPathPay(
+            targetAccountId,
+            paymentPayload.amount, paymentPayload.assetCode,
+            decodedStellarPrivateKey);
+
+        eventSource.setProcessed(Boolean.TRUE);
+        eventSource.setErrorMessage("");
+        eventSource.setOutstandingRetries(0);
+        logger.info("Horizon payment processed.");
+        //TODO: adjust mifos balance
+      }
+      catch (
+          final InvalidConfigurationException |
+          StellarPaymentFailedException |
+          FederationFailedException ex)
+      {
+        eventSource.setProcessed(Boolean.FALSE);
+        eventSource.setErrorMessage(ex.getMessage());
+        if (outstandingRetries == 1) {
+          logger.error("Last payment attempt failed because: {}", ex.getMessage());
+        }
+      }
+      catch (final InvalidStellarAddressException ex)
+      {
+        eventSource.setProcessed(Boolean.FALSE);
+        eventSource.setErrorMessage(ex.getMessage());
+        eventSource.setOutstandingRetries(0);
+        logger.error("Invalid stellar address: {}", paymentPayload.targetAccount);
+      }
+      finally {
+        eventSource.setLastModifiedOn(new Date());
+        this.mifosEventRepository.save(eventSource);
+      }
+    });
   }
 }
