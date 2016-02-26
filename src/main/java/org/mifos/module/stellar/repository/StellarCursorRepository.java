@@ -19,6 +19,7 @@ import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.stream.Stream;
 
 
@@ -28,4 +29,5 @@ public interface StellarCursorRepository extends CrudRepository<StellarCursorPer
   Stream<StellarCursorPersistency> findByProcessedTrueOrderByIdDesc();
   void deleteByProcessedTrue();
 
+  Optional<StellarCursorPersistency> findTopByProcessedTrueOrderByIdDesc();
 }

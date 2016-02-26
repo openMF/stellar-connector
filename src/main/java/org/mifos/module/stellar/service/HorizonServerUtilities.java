@@ -76,7 +76,7 @@ public class HorizonServerUtilities {
           this.initialBalance);
     }
     this.initialBalance = initialBalance;
-    accounts = CacheBuilder.newBuilder().maximumSize(300).concurrencyLevel(10).build(
+    accounts = CacheBuilder.newBuilder().build(
         new CacheLoader<String, HorizonSequencer>() {
           public HorizonSequencer load(final String accountId)
               throws InvalidConfigurationException {
