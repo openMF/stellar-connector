@@ -24,4 +24,5 @@ public class PaymentPersistency {
   public String sinkDomain;
   public String targetAccount;
   public String targetSubAccount;
+  public boolean isStellarPayment;
 }

@@ -210,8 +210,6 @@ public class StellarBridgeController {
         HttpStatus.OK);
   }
 
-  //TODO: missing a resend for payments whose processing fails.
-
   @RequestMapping(value = "/payments/", method = RequestMethod.POST,
       consumes = {"application/json"}, produces = {"application/json"})
   public ResponseEntity<Void> sendStellarPayment(
@@ -231,9 +229,13 @@ public class StellarBridgeController {
       final PaymentPersistency payment =
           journalEntryPaymentMapper.mapToPayment(mifosTenantId, journalEntry);
 
+      if (!payment.isStellarPayment)
+      {
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+      }
+
       this.stellarBridgeService.sendPaymentToStellar(payment);
     }
-    //TODO: return No content if it's not our request.  Because we don't need to do anything.
 
     return new ResponseEntity<>(HttpStatus.ACCEPTED);
   }

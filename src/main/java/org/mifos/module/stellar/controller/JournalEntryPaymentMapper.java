@@ -23,6 +23,9 @@ import java.math.BigDecimal;
 
 @Component
 public class JournalEntryPaymentMapper {
+
+  public static final String STELLAR_ROUTING_CODE = "STELLAR";
+
   PaymentPersistency mapToPayment(
       final String mifosTenantId,
       final JournalEntryData journalEntryData) {
@@ -36,6 +39,8 @@ public class JournalEntryPaymentMapper {
     ret.sourceTenantId = mifosTenantId;
     ret.targetAccount = journalEntryData.transactionDetails.paymentDetails.accountNumber;
     ret.sinkDomain = journalEntryData.transactionDetails.paymentDetails.bankNumber;
+    ret.isStellarPayment = (journalEntryData.transactionDetails.paymentDetails.routingCode.equals(
+        STELLAR_ROUTING_CODE));
     ret.targetSubAccount = "";
 
 
