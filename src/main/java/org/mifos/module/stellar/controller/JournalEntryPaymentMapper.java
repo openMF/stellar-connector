@@ -15,6 +15,7 @@
  */
 package org.mifos.module.stellar.controller;
 
+import com.google.common.base.Preconditions;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.restdomain.JournalEntryData;
 import org.springframework.stereotype.Component;
@@ -26,9 +27,24 @@ public class JournalEntryPaymentMapper {
 
   public static final String STELLAR_ROUTING_CODE = "STELLAR";
 
-  PaymentPersistency mapToPayment(
+  PaymentPersistency mapToPayment (
       final String mifosTenantId,
-      final JournalEntryData journalEntryData) {
+      final JournalEntryData journalEntryData)  throws InvalidJournalEntryException {
+
+    Preconditions.checkNotNull(journalEntryData);
+    if ((journalEntryData.transactionDetails == null) ||
+        (journalEntryData.currency == null) ||
+        (journalEntryData.amount == null) ||
+        (journalEntryData.transactionDetails.paymentDetails == null) ||
+        (journalEntryData.transactionDetails.paymentDetails.routingCode == null) ||
+        (journalEntryData.transactionDetails.paymentDetails.accountNumber == null) ||
+        (journalEntryData.transactionDetails.paymentDetails.bankNumber == null) ||
+        (journalEntryData.currency.inMultiplesOf == null) ||
+        (journalEntryData.currency.code == null))
+    {
+      throw new InvalidJournalEntryException();
+    }
+
     final PaymentPersistency ret = new PaymentPersistency();
 
     //TODO: it's unclear if any of this is correct. Ask Adi.

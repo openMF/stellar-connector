@@ -16,6 +16,7 @@
 package org.mifos.module.stellar.persistencedomain;
 
 import javax.persistence.*;
+import java.util.Date;
 
 @Entity
 @Table(name = "stellar_cursor")
@@ -33,12 +34,17 @@ public class StellarCursorPersistency {
   @Column(name = "processed")
   private Boolean processed;
 
+  @Column(name = "created_on")
+  @Temporal(TemporalType.TIMESTAMP)
+  private Date createdOn;
+
   @SuppressWarnings("unused")
   public StellarCursorPersistency() { }
 
-  public StellarCursorPersistency(final String cursor) {
+  public StellarCursorPersistency(final String cursor, final Date createdOn) {
     this.cursor = cursor;
     this.processed = false;
+    this.createdOn = createdOn;
   }
 
   public String getCursor() {
@@ -47,5 +53,14 @@ public class StellarCursorPersistency {
 
   public void setProcessed(Boolean processed) {
     this.processed = processed;
+  }
+
+  @SuppressWarnings("unused")
+  public Date getCreatedOn() {
+    return createdOn;
+  }
+
+  public void setCreatedOn(final Date createdOn) {
+    this.createdOn = createdOn;
   }
 }

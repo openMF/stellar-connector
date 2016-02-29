@@ -15,19 +15,22 @@
  */
 package org.mifos.module.stellar.persistencedomain;
 
+
 import javax.persistence.*;
 import java.util.Date;
 
 @Entity
-@Table(name = "mifos_payment_event")
-public class MifosEventPersistency {
-
+@Table(name = "stellar_adjust_offer_event")
+public class StellarAdjustOfferEventPersistency {
   @Id
   @GeneratedValue
   private Long id;
 
-  @Column(name = "payload")
-  private String payload;
+  @Column(name = "mifos_tenant_id")
+  private String mifosTenantId;
+
+  @Column(name = "asset_code")
+  private String assetCode;
 
   @Column(name = "processed")
   private Boolean processed;
@@ -42,28 +45,26 @@ public class MifosEventPersistency {
   @Temporal(TemporalType.TIMESTAMP)
   private Date createdOn;
 
-  @Column(name = "last_modified_on")
-  @Temporal(TemporalType.TIMESTAMP)
-  private Date lastModifiedOn;
-
-
   public Long getId() {
     return id;
   }
 
-  public void setId(Long id) {
-    this.id = id;
+  public String getMifosTenantId() {
+    return mifosTenantId;
   }
 
-  public String getPayload() {
-    return payload;
+  public void setMifosTenantId(final String mifosTenantId) {
+    this.mifosTenantId = mifosTenantId;
   }
 
-  public void setPayload(final String payload) {
-    this.payload = payload;
+  public String getAssetCode() {
+    return assetCode;
   }
 
-  @SuppressWarnings("unused")
+  public void setAssetCode(final String assetCode) {
+    this.assetCode = assetCode;
+  }
+
   public Boolean getProcessed() {
     return processed;
   }
@@ -76,7 +77,7 @@ public class MifosEventPersistency {
     return outstandingRetries;
   }
 
-  public void setOutstandingRetries(final Integer outstandingRetries) {
+  public void setOutstandingRetries(Integer outstandingRetries) {
     this.outstandingRetries = outstandingRetries;
   }
 
@@ -96,14 +97,5 @@ public class MifosEventPersistency {
 
   public void setCreatedOn(final Date createdOn) {
     this.createdOn = createdOn;
-  }
-
-  @SuppressWarnings("unused")
-  public Date getLastModifiedOn() {
-    return lastModifiedOn;
-  }
-
-  public void setLastModifiedOn(final Date lastModifiedOn) {
-    this.lastModifiedOn = lastModifiedOn;
   }
 }

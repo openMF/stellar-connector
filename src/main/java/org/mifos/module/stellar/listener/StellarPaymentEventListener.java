@@ -13,17 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.repository;
+package org.mifos.module.stellar.listener;
 
-import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.ApplicationListener;
+import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+@Component
+public class StellarPaymentEventListener implements ApplicationListener<StellarPaymentEvent> {
+  @Override public void onApplicationEvent(final StellarPaymentEvent event) {
 
-
-@Repository
-public interface StellarCursorRepository extends CrudRepository<StellarCursorPersistency, Long> {
-  Optional<StellarCursorPersistency> findTopByProcessedTrueOrderByCreatedOnDesc();
-  StellarCursorPersistency findByCursor(String cursor);
+  }
 }

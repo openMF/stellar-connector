@@ -19,21 +19,23 @@ import javax.persistence.*;
 import java.util.Date;
 
 @Entity
-@Table(name = "mifos_payment_event")
-public class MifosEventPersistency {
-
+@Table(name = "stellar_payment_event")
+public class StellarPaymentEventPersistency {
   @Id
   @GeneratedValue
   private Long id;
 
-  @Column(name = "payload")
-  private String payload;
+  @Column(name = "mifos_tenant_id")
+  private String mifosTenantId;
+
+  @Column(name = "asset_code")
+  private String assetCode;
+
+  @Column(name = "amount")
+  private String amount;
 
   @Column(name = "processed")
   private Boolean processed;
-
-  @Column(name = "outstanding_retries")
-  private Integer outstandingRetries;
 
   @Column(name = "error_message")
   private String errorMessage;
@@ -42,28 +44,38 @@ public class MifosEventPersistency {
   @Temporal(TemporalType.TIMESTAMP)
   private Date createdOn;
 
-  @Column(name = "last_modified_on")
-  @Temporal(TemporalType.TIMESTAMP)
-  private Date lastModifiedOn;
-
-
   public Long getId() {
     return id;
   }
 
-  public void setId(Long id) {
+  public void setId(final Long id) {
     this.id = id;
   }
 
-  public String getPayload() {
-    return payload;
+  public String getMifosTenantId() {
+    return mifosTenantId;
   }
 
-  public void setPayload(final String payload) {
-    this.payload = payload;
+  public void setMifosTenantId(final String mifosTenantId) {
+    this.mifosTenantId = mifosTenantId;
   }
 
-  @SuppressWarnings("unused")
+  public String getAssetCode() {
+    return assetCode;
+  }
+
+  public void setAssetCode(String assetCode) {
+    this.assetCode = assetCode;
+  }
+
+  public String getAmount() {
+    return amount;
+  }
+
+  public void setAmount(String amount) {
+    this.amount = amount;
+  }
+
   public Boolean getProcessed() {
     return processed;
   }
@@ -72,15 +84,6 @@ public class MifosEventPersistency {
     this.processed = processed;
   }
 
-  public Integer getOutstandingRetries() {
-    return outstandingRetries;
-  }
-
-  public void setOutstandingRetries(final Integer outstandingRetries) {
-    this.outstandingRetries = outstandingRetries;
-  }
-
-  @SuppressWarnings("unused")
   public String getErrorMessage() {
     return errorMessage;
   }
@@ -89,21 +92,11 @@ public class MifosEventPersistency {
     this.errorMessage = errorMessage;
   }
 
-  @SuppressWarnings("unused")
   public Date getCreatedOn() {
     return createdOn;
   }
 
-  public void setCreatedOn(final Date createdOn) {
+  public void setCreatedOn(Date createdOn) {
     this.createdOn = createdOn;
-  }
-
-  @SuppressWarnings("unused")
-  public Date getLastModifiedOn() {
-    return lastModifiedOn;
-  }
-
-  public void setLastModifiedOn(final Date lastModifiedOn) {
-    this.lastModifiedOn = lastModifiedOn;
   }
 }

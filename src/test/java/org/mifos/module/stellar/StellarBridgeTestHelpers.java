@@ -42,6 +42,7 @@ public class StellarBridgeTestHelpers {
   public static final String ACTION_HEADER_VALUE = "CREATE";
   public static final Header CONTENT_TYPE_HEADER = new Header("Content-Type", "application/json");
   public static final String TEST_ADDRESS_DOMAIN = "test.org";
+  public static final String STELLAR_ROUTING_CODE = "STELLAR";
 
   /**
    * @return the api key used when accessing the tenantName
@@ -283,6 +284,7 @@ public class StellarBridgeTestHelpers {
     payment.transactionDetails.paymentDetails = new PaymentDetailData();
     payment.transactionDetails.paymentDetails.bankNumber = toDomain;
     payment.transactionDetails.paymentDetails.accountNumber = toTenant;
+    payment.transactionDetails.paymentDetails.routingCode = STELLAR_ROUTING_CODE;
 
     return new Gson().toJson(payment);
   }

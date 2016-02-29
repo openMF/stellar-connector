@@ -15,40 +15,59 @@
  */
 package org.mifos.module.stellar.service;
 
-import org.mifos.module.stellar.federation.StellarAccountId;
-import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
+import org.mifos.module.stellar.listener.StellarAdjustOfferEvent;
+import org.mifos.module.stellar.listener.StellarPaymentEvent;
+import org.mifos.module.stellar.persistencedomain.*;
 import org.mifos.module.stellar.repository.AccountBridgeRepository;
+import org.mifos.module.stellar.repository.StellarAdjustOfferEventRepository;
 import org.mifos.module.stellar.repository.StellarCursorRepository;
+import org.mifos.module.stellar.repository.StellarPaymentEventRepository;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.stereotype.Component;
 import org.stellar.sdk.Asset;
+import org.stellar.sdk.AssetTypeCreditAlphaNum;
 import org.stellar.sdk.requests.EventListener;
 import org.stellar.sdk.responses.effects.AccountCreditedEffectResponse;
 import org.stellar.sdk.responses.effects.AccountDebitedEffectResponse;
 import org.stellar.sdk.responses.effects.EffectResponse;
 
-@Component
-public class HorizonServerEffectsListener implements EventListener<EffectResponse> {
+import java.util.Date;
+import java.util.Optional;
 
+@Component
+public class HorizonServerEffectsListener implements EventListener<EffectResponse>,
+    ApplicationEventPublisherAware {
+
+  private static final Integer ADJUSTOFFER_PROCESSING_MAXIMUM_RETRY_COUNT = 3;
   private final AccountBridgeRepository accountBridgeRepository;
   private final StellarCursorRepository stellarCursorRepository;
-  private final HorizonServerUtilities horizonServerUtilities;
+  private final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository;
+  private final StellarPaymentEventRepository stellarPaymentEventRepository;
+  private ApplicationEventPublisher eventPublisher;
   private final Logger logger;
 
 
   @Autowired HorizonServerEffectsListener(
       final AccountBridgeRepository accountBridgeRepository,
       final StellarCursorRepository stellarCursorRepository,
-      final HorizonServerUtilities horizonServerUtilities,
+      final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository,
+      final StellarPaymentEventRepository stellarPaymentEventRepository,
       final @Qualifier("stellarBridgeLogger") Logger logger)
   {
     this.accountBridgeRepository = accountBridgeRepository;
     this.stellarCursorRepository = stellarCursorRepository;
-    this.horizonServerUtilities = horizonServerUtilities;
+    this.stellarAdjustOfferEventRepository = stellarAdjustOfferEventRepository;
+    this.stellarPaymentEventRepository = stellarPaymentEventRepository;
     this.logger = logger;
+  }
+
+  @Override
+  public void setApplicationEventPublisher(final ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
   }
 
   @Override public void onEvent(final EffectResponse operation) {
@@ -73,7 +92,7 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
     if (entry != null)
       return null;
 
-    return stellarCursorRepository.save(new StellarCursorPersistency(pagingToken));
+    return stellarCursorRepository.save(new StellarCursorPersistency(pagingToken, new Date()));
   }
 
   private void handleOperation(final EffectResponse effect) {
@@ -94,12 +113,25 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
       logger.info("Credit to {} of {}, in currency {}@{}",
           toAccount.getMifosTenantId(), amount, assetCode, issuer);
 
-      horizonServerUtilities.adjustOffer(toAccount.getStellarAccountPrivateKey(),
-          StellarAccountId.mainAccount(toAccount.getStellarVaultAccountId()), asset);
+      if (!(asset instanceof AssetTypeCreditAlphaNum))
+        return;
 
-      //TODO: let mifos know about the money.
-      //TODO: This is a very slow approach.  Better would be to wait for multiple operations, and adjust just once.
-      //TODO: In case stellar transaction fails, should not be throwing runtime exceptions back at stellar.
+
+      if (toAccount.getStellarVaultAccountId() != null) { //Only adjust offers if has a vault account.
+        final Long adjustmentEventId =
+            this.saveAdjustmentEvent(toAccount.getMifosTenantId(), assetCode);
+
+        this.eventPublisher.publishEvent(
+            new StellarAdjustOfferEvent(this, adjustmentEventId, toAccount.getMifosTenantId(), assetCode));
+      }
+
+      final Long stellarPaymentEventId
+          = this.savePaymentEvent(toAccount.getMifosTenantId(), assetCode, amount);
+
+
+      this.eventPublisher.publishEvent(
+          new StellarPaymentEvent(this, stellarPaymentEventId, toAccount.getMifosTenantId(),
+              assetCode, amount));
     }
     else if (effect instanceof AccountDebitedEffectResponse)
     {
@@ -118,14 +150,68 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
       logger.info("Debit to {} of {}, in currency {}@{}",
           toAccount.getMifosTenantId(), amount, assetCode, issuer);
 
-      horizonServerUtilities.adjustOffer(toAccount.getStellarAccountPrivateKey(),
-          StellarAccountId.mainAccount(toAccount.getStellarVaultAccountId()), asset);
+      if (!(asset instanceof AssetTypeCreditAlphaNum))
+        return;
 
-      //TODO: let mifos know about the money.
+      if (toAccount.getStellarVaultAccountId() != null) { //Only adjust offers if has a vault account.
+        final Long adjustmentEventId =
+            this.saveAdjustmentEvent(toAccount.getMifosTenantId(), assetCode);
+
+        this.eventPublisher.publishEvent(
+            new StellarAdjustOfferEvent(this, adjustmentEventId, toAccount.getMifosTenantId(), assetCode));
+      }
+
+      final Long stellarPaymentEventId
+          = this.savePaymentEvent(toAccount.getMifosTenantId(), assetCode, amount);
+
+
+      this.eventPublisher.publishEvent(
+          new StellarPaymentEvent(this, stellarPaymentEventId, toAccount.getMifosTenantId(),
+              assetCode, amount));
     }
     else
     {
       logger.info("Effect of type {}", effect.getType());
     }
+  }
+
+  private Long savePaymentEvent(
+      final String mifosTenantId,
+      final String assetCode,
+      final String amount) {
+    final StellarPaymentEventPersistency eventSource = new StellarPaymentEventPersistency();
+    eventSource.setMifosTenantId(mifosTenantId);
+    eventSource.setAssetCode(assetCode);
+    eventSource.setAmount(amount);
+    eventSource.setProcessed(Boolean.FALSE);
+    eventSource.setErrorMessage("");
+    eventSource.setCreatedOn(new Date());
+
+    return this.stellarPaymentEventRepository.save(eventSource).getId();
+  }
+
+  synchronized private Long saveAdjustmentEvent(final String mifosTenantId, final String assetCode) {
+    final Optional<StellarAdjustOfferEventPersistency> existingEvent =
+        this.stellarAdjustOfferEventRepository
+            .findAnyByProcessedFalseAndOutstandingRetriesGreaterThanAndMifosTenantIdEqualsAndAssetCodeEquals(0, mifosTenantId, assetCode);
+
+    final StellarAdjustOfferEventPersistency eventSource;
+    if (existingEvent.isPresent())
+    {
+      eventSource = existingEvent.get();
+      eventSource.setOutstandingRetries(ADJUSTOFFER_PROCESSING_MAXIMUM_RETRY_COUNT);
+
+    }
+    else {
+      eventSource = new StellarAdjustOfferEventPersistency();
+      eventSource.setMifosTenantId(mifosTenantId);
+      eventSource.setAssetCode(assetCode);
+      eventSource.setProcessed(Boolean.FALSE);
+      eventSource.setOutstandingRetries(ADJUSTOFFER_PROCESSING_MAXIMUM_RETRY_COUNT);
+      eventSource.setErrorMessage("");
+      eventSource.setCreatedOn(new Date());
+    }
+
+    return this.stellarAdjustOfferEventRepository.save(eventSource).getId();
   }
 }

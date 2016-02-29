@@ -260,42 +260,49 @@ public class StellarBridgeController {
   @ExceptionHandler
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public String handleInvalidApiKeyException(
-      @SuppressWarnings("unused") final SecurityException ex) {
+      final SecurityException ex) {
     return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public String handleInvalidConfigurationException(
-      @SuppressWarnings("unused") final InvalidConfigurationException ex) {
+      final InvalidConfigurationException ex) {
     return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public String handleStellarAccountCreationFailedException(
-      @SuppressWarnings("unused") final StellarAccountCreationFailedException ex) {
+      final StellarAccountCreationFailedException ex) {
     return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public String handleInvalidStellarAddressException(
-      @SuppressWarnings("unused") final InvalidStellarAddressException ex) {
+      final InvalidStellarAddressException ex) {
     return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public String handleFederationFailedException(
-      @SuppressWarnings("unused") final FederationFailedException ex) {
+      final FederationFailedException ex) {
+    return ex.getMessage();
+  }
+
+  @ExceptionHandler
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public String handleInvalidJournalEntryException(
+      final InvalidJournalEntryException ex) {
     return ex.getMessage();
   }
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public String handleStellarCreditLineCreationFailedException(
-      @SuppressWarnings("unused") final StellarTrustLineAdjustmentFailedException ex)
+      final StellarTrustLineAdjustmentFailedException ex)
   {
     return ex.getMessage();
     //TODO: figure out how to communicate missing funds problem to user.

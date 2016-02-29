@@ -15,15 +15,17 @@
  */
 package org.mifos.module.stellar.repository;
 
-import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
+import org.mifos.module.stellar.persistencedomain.StellarAdjustOfferEventPersistency;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
-
+import java.util.stream.Stream;
 
 @Repository
-public interface StellarCursorRepository extends CrudRepository<StellarCursorPersistency, Long> {
-  Optional<StellarCursorPersistency> findTopByProcessedTrueOrderByCreatedOnDesc();
-  StellarCursorPersistency findByCursor(String cursor);
+public interface StellarAdjustOfferEventRepository extends
+    CrudRepository<StellarAdjustOfferEventPersistency, Long> {
+  Stream<StellarAdjustOfferEventPersistency> findByProcessedFalseAndOutstandingRetriesGreaterThan(int i);
+  Optional<StellarAdjustOfferEventPersistency> findAnyByProcessedFalseAndOutstandingRetriesGreaterThanAndMifosTenantIdEqualsAndAssetCodeEquals
+      (int i, String mifosTenantId, String assetCode);
 }

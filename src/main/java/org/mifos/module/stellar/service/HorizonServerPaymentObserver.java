@@ -68,7 +68,7 @@ public class HorizonServerPaymentObserver {
 
   private Optional<String> getCurrentCursor() {
     final Optional<StellarCursorPersistency> cursorPersistency
-        = stellarCursorRepository.findTopByProcessedTrueOrderByIdDesc();
+        = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
     if (!cursorPersistency.isPresent())
       return Optional.empty();
     else

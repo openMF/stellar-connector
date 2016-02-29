@@ -17,9 +17,12 @@ package org.mifos.module.stellar.service;
 
 import com.google.gson.Gson;
 import org.mifos.module.stellar.listener.MifosPaymentEvent;
+import org.mifos.module.stellar.listener.StellarAdjustOfferEvent;
 import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
+import org.mifos.module.stellar.persistencedomain.StellarAdjustOfferEventPersistency;
 import org.mifos.module.stellar.repository.MifosEventRepository;
+import org.mifos.module.stellar.repository.StellarAdjustOfferEventRepository;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -35,6 +38,7 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
   private final MifosEventRepository mifosEventRepository;
   private final Gson gson;
   private final Logger logger;
+  private final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository;
 
   private ApplicationEventPublisher applicationEventPublisher;
 
@@ -42,15 +46,17 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
   UnprocessedMifosPaymentObserver(
       final Gson gson,
       final MifosEventRepository mifosEventRepository,
+      final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository,
       @Qualifier("stellarBridgeLogger")final Logger logger)
   {
     this.mifosEventRepository = mifosEventRepository;
+    this.stellarAdjustOfferEventRepository = stellarAdjustOfferEventRepository;
     this.gson = gson;
     this.logger = logger;
   }
 
   @Scheduled(fixedRate=3600000) //Once an hour.
-  void resendUnprocessedEvents() {
+  void resendUnprocessedMifosPayments() {
     logger.info("Checking for and resending unprocessed payment events.");
     final Stream<MifosEventPersistency> events
         = this.mifosEventRepository.findByProcessedFalseAndOutstandingRetriesGreaterThan(0);
@@ -63,6 +69,25 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
               new MifosPaymentEvent(this, event.getId(), payment));
         });
   }
+
+  @Scheduled(fixedRate=3600000) //Once an hour.
+  void resendUnprocessedStellarAdjustments() {
+    logger.info("Checking for and resending unprocessed adjustments.");
+    final Stream<StellarAdjustOfferEventPersistency> events
+        = this.stellarAdjustOfferEventRepository.findByProcessedFalseAndOutstandingRetriesGreaterThan(0);
+
+    events.forEach(
+        event -> {
+          final StellarAdjustOfferEvent adjustOfferEvent
+              = new StellarAdjustOfferEvent(this, event.getId(), event.getMifosTenantId(),
+              event.getAssetCode());
+
+          this.applicationEventPublisher.publishEvent(adjustOfferEvent);
+        });
+  }
+
+  //TODO: periodically cleanup the cursor repository.
+  //TODO: consider cleaning up the adjustments repository periodically.
 
   @Override
   public void setApplicationEventPublisher

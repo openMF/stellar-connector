@@ -53,7 +53,6 @@ public class HorizonServerUtilities {
 
   @Value("${stellar.installation-account-private-key}")
   private String installationAccountPrivateKey;
-  //TODO: keeping installationAccountPrivateKey as String? Should this be removed from memory?
 
   @Value("${stellar.new-account-initial-balance}")
   private int initialBalance = STELLAR_MINIMUM_BALANCE;
@@ -82,7 +81,7 @@ public class HorizonServerUtilities {
               throws InvalidConfigurationException {
             final KeyPair accountKeyPair = KeyPair.fromAccountId(accountId);
             final StellarAccountHelpers account = getAccount(accountKeyPair);
-            final Long sequenceNumber = account.get().getSequenceNumber() + 1;
+            final Long sequenceNumber = account.get().getSequenceNumber();
             return new HorizonSequencer(accountKeyPair, sequenceNumber);
           }
         });
@@ -292,16 +291,14 @@ public class HorizonServerUtilities {
   public void adjustOffer(
       final char[] stellarAccountPrivateKey,
       final StellarAccountId vaultAccountId,
-      final Asset asset) {
+      final String assetCode)
+      throws InvalidConfigurationException, StellarOfferAdjustmentFailedException {
     logger.info("HorizonServerUtilities.adjustOffer");
-    if (!(asset instanceof AssetTypeCreditAlphaNum))
-      return;
 
     final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
 
     final HorizonSequencer account = accounts.getUnchecked(accountKeyPair.getAccountId());
 
-    final String assetCode = getAssetCode(asset);
     final Asset vaultAsset = getAsset(assetCode, vaultAccountId);
 
     final StellarAccountHelpers accountHelper = getAccount(accountKeyPair);
@@ -442,7 +439,6 @@ public class HorizonServerUtilities {
       final Set<Asset> targetAssets,
       final KeyPair sourceAccountKeyPair,
       final KeyPair targetAccountKeyPair) {
-    //TODO: retries.
     if (sourceAssets.isEmpty())
       return Optional.empty();
 
