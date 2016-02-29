@@ -34,7 +34,7 @@ import org.springframework.stereotype.Component;
 import java.util.stream.Stream;
 
 @Component
-public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublisherAware {
+public class UnprocessedEventObserver implements ApplicationEventPublisherAware {
   private final MifosPaymentEventRepository mifosPaymentEventRepository;
   private final Gson gson;
   private final Logger logger;
@@ -42,8 +42,7 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
 
   private ApplicationEventPublisher applicationEventPublisher;
 
-  @Autowired
-  UnprocessedMifosPaymentObserver(
+  @Autowired UnprocessedEventObserver(
       final Gson gson,
       final MifosPaymentEventRepository mifosPaymentEventRepository,
       final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository,
@@ -70,7 +69,7 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
         });
   }
 
-  @Scheduled(fixedRate=3600000) //Once an hour.
+  @Scheduled(fixedRate=10000) //Once every ten seconds.
   void resendUnprocessedStellarAdjustments() {
     logger.info("Checking for and resending unprocessed adjustments.");
     final Stream<StellarAdjustOfferEventPersistency> events

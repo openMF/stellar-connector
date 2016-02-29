@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.horizonadapter;
 
 import org.mifos.module.stellar.listener.StellarAdjustOfferEvent;
 import org.mifos.module.stellar.listener.StellarPaymentEvent;

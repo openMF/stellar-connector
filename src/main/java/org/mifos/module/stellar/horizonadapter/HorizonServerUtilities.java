@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.horizonadapter;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import javafx.util.Pair;
 import org.mifos.module.stellar.federation.StellarAccountId;
+import org.mifos.module.stellar.service.*;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,8 +37,6 @@ import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.util.Optional;
 import java.util.Set;
-
-import static org.mifos.module.stellar.service.StellarAccountHelpers.*;
 
 @Component
 public class HorizonServerUtilities {
@@ -171,7 +170,7 @@ public class HorizonServerUtilities {
     final HorizonSequencer trustingAccount
         = accounts.getUnchecked(trustingAccountKeyPair.getAccountId());
 
-    final Asset asset = getAsset(assetCode, issuingStellarAccountId);
+    final Asset asset = StellarAccountHelpers.getAsset(assetCode, issuingStellarAccountId);
 
     final BigDecimal balance = getAccount(trustingAccountKeyPair).getBalanceOfAsset(asset);
 
@@ -182,7 +181,7 @@ public class HorizonServerUtilities {
         new Transaction.Builder(trustingAccount.getAccount());
 
     final ChangeTrustOperation trustOperation =
-        new ChangeTrustOperation.Builder(asset, bigDecimalToStellarBalance(trustSize)).build();
+        new ChangeTrustOperation.Builder(asset, StellarAccountHelpers.bigDecimalToStellarBalance(trustSize)).build();
 
     trustTransactionBuilder.addOperation(trustOperation);
 
@@ -201,7 +200,7 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, StellarPaymentFailedException
   {
     logger.info("HorizonServerUtilities.simplePay");
-    final Asset asset = getAsset(assetCode, issuingAccountId);
+    final Asset asset = StellarAccountHelpers.getAsset(assetCode, issuingAccountId);
 
     pay(targetAccountId, amount, asset, asset, stellarAccountPrivateKey);
   }
@@ -224,10 +223,10 @@ public class HorizonServerUtilities {
     final PathPaymentOperation paymentOperation =
         new PathPaymentOperation.Builder(
             sendAsset,
-            bigDecimalToStellarBalance(amount),
+            StellarAccountHelpers.bigDecimalToStellarBalance(amount),
             targetAccountKeyPair,
             receiveAsset,
-            bigDecimalToStellarBalance(amount))
+            StellarAccountHelpers.bigDecimalToStellarBalance(amount))
             .setSourceAccount(sourceAccountKeyPair).build();
 
     transferTransactionBuilder.addOperation(paymentOperation);
@@ -269,7 +268,7 @@ public class HorizonServerUtilities {
   {
     logger.info("HorizonServerUtilities.getBalanceByIssuer");
 
-    final Asset asset = getAsset(assetCode, accountIdOfIssuingStellarAddress);
+    final Asset asset = StellarAccountHelpers.getAsset(assetCode, accountIdOfIssuingStellarAddress);
 
     return getAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()))
         .getBalanceOfAsset(asset);
@@ -283,7 +282,7 @@ public class HorizonServerUtilities {
     logger.info("HorizonServerUtilities.currencyTrustSize");
     final StellarAccountHelpers trustingAccount
         = getAccount(KeyPair.fromAccountId(trustingAccountId.getPublicKey()));
-    final Asset asset = getAsset(assetCode, issuingAccountId);
+    final Asset asset = StellarAccountHelpers.getAsset(assetCode, issuingAccountId);
 
     return trustingAccount.getTrustInAsset(asset);
   }
@@ -299,7 +298,7 @@ public class HorizonServerUtilities {
 
     final HorizonSequencer account = accounts.getUnchecked(accountKeyPair.getAccountId());
 
-    final Asset vaultAsset = getAsset(assetCode, vaultAccountId);
+    final Asset vaultAsset = StellarAccountHelpers.getAsset(assetCode, vaultAccountId);
 
     final StellarAccountHelpers accountHelper = getAccount(accountKeyPair);
     final BigDecimal balanceOfVaultAsset = accountHelper.getBalanceOfAsset(vaultAsset);
@@ -307,13 +306,14 @@ public class HorizonServerUtilities {
 
     final Transaction.Builder transactionBuilder = new Transaction.Builder(account.getAccount());
     accountHelper.getBalancesStream(assetCode, vaultAsset)
+        .filter(balance -> !balance.getAssetIssuer().equals(vaultAccountId.getPublicKey()))
         .map(balance -> offerOperation(
                 accountKeyPair,
-                getAssetOfBalance(balance),
+                StellarAccountHelpers.getAssetOfBalance(balance),
                 vaultAsset,
                 determineOfferAmount(balanceOfVaultAsset,
                     remainingTrustInVaultAsset,
-                    stellarBalanceToBigDecimal(balance.getBalance()))))
+                    StellarAccountHelpers.stellarBalanceToBigDecimal(balance.getBalance()))))
         .forEach(transactionBuilder::addOperation);
 
     if (transactionBuilder.getOperationsCount() != 0)
@@ -338,7 +338,7 @@ public class HorizonServerUtilities {
   {
     final ManageOfferOperation.Builder offerOperationBuilder
         = new ManageOfferOperation.Builder(
-        fromAsset, toAsset, bigDecimalToStellarBalance(amount), "1");
+        fromAsset, toAsset, StellarAccountHelpers.bigDecimalToStellarBalance(amount), "1");
     offerOperationBuilder.setSourceAccount(sourceAccountKeyPair);
     return offerOperationBuilder.build();
   }
@@ -449,7 +449,7 @@ public class HorizonServerUtilities {
             .sourceAccount(sourceAccountKeyPair)
             .destinationAccount(targetAccountKeyPair)
             .destinationAsset(targetAsset)
-            .destinationAmount(bigDecimalToStellarBalance(amount))
+            .destinationAmount(StellarAccountHelpers.bigDecimalToStellarBalance(amount))
             .execute();
       } catch (final IOException e) {
         return Optional.empty();
@@ -458,7 +458,7 @@ public class HorizonServerUtilities {
       while (paths != null) {
         for (final PathResponse path : paths.getRecords())
         {
-          if (stellarBalanceToBigDecimal(path.getSourceAmount()).compareTo(amount) <= 0)
+          if (StellarAccountHelpers.stellarBalanceToBigDecimal(path.getSourceAmount()).compareTo(amount) <= 0)
           {
             if (sourceAssets.contains(path.getSourceAsset()))
             {

@@ -43,7 +43,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "org.mifos.module.stellar.listener",
     "org.mifos.module.stellar.controller",
     "org.mifos.module.stellar.repository",
-    "org.mifos.module.stellar.federation"
+    "org.mifos.module.stellar.federation",
+    "org.mifos.module.stellar.horizonadapter",
+    "org.mifos.module.stellar.fineractadapter"
 })
 @EnableAsync
 @EnableScheduling

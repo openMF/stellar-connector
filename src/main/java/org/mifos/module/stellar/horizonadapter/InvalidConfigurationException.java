@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.horizonadapter;
 
 
 public class InvalidConfigurationException extends RuntimeException {

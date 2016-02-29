@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
 import java.util.Date;
 
 @Component
-public class PaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
+public class MifosPaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
 
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
   private final MifosPaymentEventRepository mifosPaymentEventRepository;
@@ -44,7 +44,7 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
 
 
   @Autowired
-  public PaymentEventListener(
+  public MifosPaymentEventListener(
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
       final MifosPaymentEventRepository mifosPaymentEventRepository,
       final HorizonServerUtilities horizonServerUtilities,

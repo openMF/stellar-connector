@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.horizonadapter;
 
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.persistencedomain.StellarCursorPersistency;
@@ -61,7 +61,7 @@ public class HorizonServerPaymentObserver {
     this.listener = listener;
   }
 
-  void setupListeningForAccount(final StellarAccountId stellarAccountId)
+  public void setupListeningForAccount(final StellarAccountId stellarAccountId)
   {
     setupListeningForAccount(stellarAccountId, getCurrentCursor());
   }

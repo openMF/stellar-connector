@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.mifos.module.stellar.service;
+package org.mifos.module.stellar.fineractadapter;
 
-import org.junit.Assert;
-import org.junit.Test;
 
-import java.math.BigDecimal;
+import retrofit.http.*;
 
-public class HorizonServerUtilitiesTest {
-  @Test
-  public void determineOfferAmount()
-  {
-    final BigDecimal offerAmount = HorizonServerUtilities
-        .determineOfferAmount(BigDecimal.valueOf(20), BigDecimal.valueOf(10),
-            BigDecimal.valueOf(15));
-    Assert.assertTrue(offerAmount.compareTo(BigDecimal.TEN) == 0);
-  }
+public interface MifosClientService {
+  @GET("/clients/{id}")
+  Client findClient(@Header("Authorization") String authorization,
+      @Header("X-Mifos-Platform-TenantId") String tenantIdentifier,
+      @Path("id") final long id);
+
+  @POST("/authentication")
+  AuthenticationResponse logon(@Header("X-Mifos-Platform-TenantId") final String tenantIdentifier,
+      @Query("username") final String username,
+      @Query("password") final String password);
 }
