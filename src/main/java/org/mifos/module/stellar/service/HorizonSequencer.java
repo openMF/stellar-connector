@@ -63,6 +63,5 @@ public class HorizonSequencer {
           }*/
       throw failureHandler.exceptionWhenTransactionFails();
     }
-    //TODO: find a way to communicate back fees
   }
 }

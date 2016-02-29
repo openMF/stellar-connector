@@ -15,13 +15,14 @@
  */
 package org.mifos.module.stellar.repository;
 
-import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.stream.Stream;
 
 @Repository
-public interface MifosEventRepository extends CrudRepository<MifosEventPersistency, Long> {
-  Stream<MifosEventPersistency> findByProcessedFalseAndOutstandingRetriesGreaterThan(int i);
+public interface MifosPaymentEventRepository
+    extends CrudRepository<MifosPaymentEventPersistency, Long> {
+  Stream<MifosPaymentEventPersistency> findByProcessedFalseAndOutstandingRetriesGreaterThan(int i);
 }

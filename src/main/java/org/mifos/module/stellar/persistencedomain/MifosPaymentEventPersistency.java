@@ -20,7 +20,7 @@ import java.util.Date;
 
 @Entity
 @Table(name = "mifos_payment_event")
-public class MifosEventPersistency {
+public class MifosPaymentEventPersistency {
 
   @Id
   @GeneratedValue

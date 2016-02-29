@@ -18,10 +18,10 @@ package org.mifos.module.stellar.service;
 import com.google.gson.Gson;
 import org.mifos.module.stellar.listener.MifosPaymentEvent;
 import org.mifos.module.stellar.listener.StellarAdjustOfferEvent;
-import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.persistencedomain.StellarAdjustOfferEventPersistency;
-import org.mifos.module.stellar.repository.MifosEventRepository;
+import org.mifos.module.stellar.repository.MifosPaymentEventRepository;
 import org.mifos.module.stellar.repository.StellarAdjustOfferEventRepository;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 
 @Component
 public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublisherAware {
-  private final MifosEventRepository mifosEventRepository;
+  private final MifosPaymentEventRepository mifosPaymentEventRepository;
   private final Gson gson;
   private final Logger logger;
   private final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository;
@@ -45,11 +45,11 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
   @Autowired
   UnprocessedMifosPaymentObserver(
       final Gson gson,
-      final MifosEventRepository mifosEventRepository,
+      final MifosPaymentEventRepository mifosPaymentEventRepository,
       final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository,
       @Qualifier("stellarBridgeLogger")final Logger logger)
   {
-    this.mifosEventRepository = mifosEventRepository;
+    this.mifosPaymentEventRepository = mifosPaymentEventRepository;
     this.stellarAdjustOfferEventRepository = stellarAdjustOfferEventRepository;
     this.gson = gson;
     this.logger = logger;
@@ -58,8 +58,8 @@ public class UnprocessedMifosPaymentObserver  implements ApplicationEventPublish
   @Scheduled(fixedRate=3600000) //Once an hour.
   void resendUnprocessedMifosPayments() {
     logger.info("Checking for and resending unprocessed payment events.");
-    final Stream<MifosEventPersistency> events
-        = this.mifosEventRepository.findByProcessedFalseAndOutstandingRetriesGreaterThan(0);
+    final Stream<MifosPaymentEventPersistency> events
+        = this.mifosPaymentEventRepository.findByProcessedFalseAndOutstandingRetriesGreaterThan(0);
 
     events.forEach(
         event -> {

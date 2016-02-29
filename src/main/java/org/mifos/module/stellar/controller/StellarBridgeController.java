@@ -301,8 +301,8 @@ public class StellarBridgeController {
 
   @ExceptionHandler
   @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public String handleStellarCreditLineCreationFailedException(
-      final StellarTrustLineAdjustmentFailedException ex)
+  public String handleStellarTrustlineAdjustmentFailedException(
+      final StellarTrustlineAdjustmentFailedException ex)
   {
     return ex.getMessage();
     //TODO: figure out how to communicate missing funds problem to user.

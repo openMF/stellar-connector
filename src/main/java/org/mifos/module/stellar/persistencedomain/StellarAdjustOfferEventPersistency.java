@@ -45,6 +45,9 @@ public class StellarAdjustOfferEventPersistency {
   @Temporal(TemporalType.TIMESTAMP)
   private Date createdOn;
 
+  @SuppressWarnings("unused")
+  public StellarAdjustOfferEventPersistency() {}
+
   public Long getId() {
     return id;
   }

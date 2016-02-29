@@ -18,10 +18,10 @@ import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.*;
 import org.mifos.module.stellar.listener.MifosPaymentEvent;
 import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.repository.AccountBridgeRepositoryDecorator;
-import org.mifos.module.stellar.repository.MifosEventRepository;
+import org.mifos.module.stellar.repository.MifosPaymentEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
@@ -36,7 +36,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
   private static final Integer PAYMENT_PROCESSING_MAXIMUM_RETRY_COUNT = 3;
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
   private ApplicationEventPublisher eventPublisher;
-  private final MifosEventRepository mifosEventRepository;
+  private final MifosPaymentEventRepository mifosPaymentEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final Gson gson;
   private final StellarAddressResolver stellarAddressResolver;
@@ -44,13 +44,13 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
 
   @Autowired
   public StellarBridgeService(
-      final MifosEventRepository mifosEventRepository,
+      final MifosPaymentEventRepository mifosPaymentEventRepository,
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
       final HorizonServerUtilities horizonServerUtilities,
       final Gson gson,
       final StellarAddressResolver stellarAddressResolver,
       final HorizonServerPaymentObserver horizonServerPaymentObserver) {
-    this.mifosEventRepository = mifosEventRepository;
+    this.mifosPaymentEventRepository = mifosPaymentEventRepository;
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.horizonServerUtilities = horizonServerUtilities;
     this.gson = gson;
@@ -103,7 +103,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
       final String assetCode,
       final BigDecimal maximumAmount)
       throws InvalidStellarAddressException,
-      FederationFailedException, StellarTrustLineAdjustmentFailedException,
+      FederationFailedException, StellarTrustlineAdjustmentFailedException,
       InvalidConfigurationException
   {
 
@@ -112,7 +112,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
 
     if (accountIdOfStellarAccountToTrust.equals(
         accountBridgeRepositoryDecorator.getStellarVaultAccountId(mifosTenantId)))
-      throw StellarTrustLineAdjustmentFailedException.selfReferentialVaultTrustline(
+      throw StellarTrustlineAdjustmentFailedException.selfReferentialVaultTrustline(
           stellarAddressToTrust.toString());
 
     final char[] stellarAccountPrivateKey
@@ -124,13 +124,13 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
   }
 
   private StellarAccountId getTopLevelStellarAccountId(StellarAddress stellarAddressToTrust)
-      throws FederationFailedException, StellarTrustLineAdjustmentFailedException
+      throws FederationFailedException, StellarTrustlineAdjustmentFailedException
   {
     final StellarAccountId accountIdOfStellarAccountToTrust =
         stellarAddressResolver.getAccountIdOfStellarAccount(stellarAddressToTrust);
 
     if (accountIdOfStellarAccountToTrust.getSubAccount().isPresent()) {
-      throw StellarTrustLineAdjustmentFailedException
+      throw StellarTrustlineAdjustmentFailedException
           .needTopLevelStellarAccount(stellarAddressToTrust.toString());
       //TODO: this function isn't just used by trustline adjustment.  Fix this.
     }
@@ -150,12 +150,10 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
     final Long eventId = this.saveEvent(payment);
 
     this.eventPublisher.publishEvent(new MifosPaymentEvent(this, eventId, payment));
-
-    //TODO: still need to ensure replaying of unplayed events.
   }
 
   private Long saveEvent(final PaymentPersistency payment) {
-    final MifosEventPersistency eventSource = new MifosEventPersistency();
+    final MifosPaymentEventPersistency eventSource = new MifosPaymentEventPersistency();
 
     final String payload = gson.toJson(payment);
     eventSource.setPayload(payload);
@@ -165,7 +163,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
     eventSource.setLastModifiedOn(now);
     eventSource.setOutstandingRetries(PAYMENT_PROCESSING_MAXIMUM_RETRY_COUNT);
 
-    return this.mifosEventRepository.save(eventSource).getId();
+    return this.mifosPaymentEventRepository.save(eventSource).getId();
   }
 
   public BigDecimal getBalance(final String mifosTenantId, final String assetCode)
@@ -180,8 +178,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
       final String assetCode,
       final StellarAddress issuingStellarAddress)
       throws InvalidConfigurationException,
-      FederationFailedException,
-      StellarTrustLineAdjustmentFailedException
+      FederationFailedException, StellarTrustlineAdjustmentFailedException
   {
     final StellarAccountId stellarAccountId
         = accountBridgeRepositoryDecorator.getStellarAccountId(mifosTenantId);

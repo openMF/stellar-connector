@@ -19,9 +19,9 @@ import org.mifos.module.stellar.federation.FederationFailedException;
 import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.federation.StellarAddress;
-import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
-import org.mifos.module.stellar.repository.MifosEventRepository;
+import org.mifos.module.stellar.repository.MifosPaymentEventRepository;
 import org.mifos.module.stellar.service.*;
 import org.mifos.module.stellar.repository.AccountBridgeRepositoryDecorator;
 import org.slf4j.Logger;
@@ -36,7 +36,7 @@ import java.util.Date;
 public class PaymentEventListener implements ApplicationListener<MifosPaymentEvent> {
 
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
-  private final MifosEventRepository mifosEventRepository;
+  private final MifosPaymentEventRepository mifosPaymentEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
   private final Logger logger;
@@ -46,12 +46,12 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
   @Autowired
   public PaymentEventListener(
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
-      final MifosEventRepository mifosEventRepository,
+      final MifosPaymentEventRepository mifosPaymentEventRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
-    this.mifosEventRepository = mifosEventRepository;
+    this.mifosPaymentEventRepository = mifosPaymentEventRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
     this.logger = logger;
@@ -64,7 +64,7 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
   {
     retrySynchronizer.sync(event.getEventId(), () ->
     {
-      final MifosEventPersistency eventSource = this.mifosEventRepository.findOne(event.getEventId());
+      final MifosPaymentEventPersistency eventSource = this.mifosPaymentEventRepository.findOne(event.getEventId());
 
       final Integer outstandingRetries = eventSource.getOutstandingRetries();
       final Boolean processed = eventSource.getProcessed();
@@ -73,7 +73,7 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
 
       eventSource.setOutstandingRetries(outstandingRetries - 1);
       eventSource.setLastModifiedOn(new Date());
-      this.mifosEventRepository.save(eventSource);
+      this.mifosPaymentEventRepository.save(eventSource);
 
       final PaymentPersistency paymentPayload = event.getPayload();
 
@@ -116,7 +116,7 @@ public class PaymentEventListener implements ApplicationListener<MifosPaymentEve
       }
       finally {
         eventSource.setLastModifiedOn(new Date());
-        this.mifosEventRepository.save(eventSource);
+        this.mifosPaymentEventRepository.save(eventSource);
       }
     });
   }

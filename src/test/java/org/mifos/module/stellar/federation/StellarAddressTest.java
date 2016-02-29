@@ -190,7 +190,7 @@ public class StellarAddressTest {
 
         assertEquals(comparison, result);
         assertEquals(result, result);
-        assertNotEquals(result, new String());
+        assertNotEquals(result, "");
         assertEquals(comparison.hashCode(), result.hashCode());
       }
 

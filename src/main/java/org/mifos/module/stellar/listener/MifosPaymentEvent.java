@@ -34,7 +34,6 @@ public class MifosPaymentEvent extends ApplicationEvent{
     this.payment = payment;
   }
 
-  @SuppressWarnings("unused")
   public Long getEventId() {
     return eventId;
   }

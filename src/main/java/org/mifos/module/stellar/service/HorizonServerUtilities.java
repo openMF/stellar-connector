@@ -156,7 +156,7 @@ public class HorizonServerUtilities {
    * @throws InvalidConfigurationException if the horizon server named in the configuration cannot
    * be reached.  Either the address is wrong or the horizon server named is't running, or there is
    * a problem with the network.
-   * @throws StellarTrustLineAdjustmentFailedException if the creation of the trustline failed for any
+   * @throws StellarTrustlineAdjustmentFailedException if the creation of the trustline failed for any
    * other reason.
    */
   public BigDecimal setTrustLineSize(
@@ -164,7 +164,7 @@ public class HorizonServerUtilities {
       final StellarAccountId issuingStellarAccountId,
       final String assetCode,
       final BigDecimal maximumAmount)
-      throws InvalidConfigurationException, StellarTrustLineAdjustmentFailedException
+      throws InvalidConfigurationException, StellarTrustlineAdjustmentFailedException
   {
     logger.info("HorizonServerUtilities.setTrustLineSize");
     final KeyPair trustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
@@ -187,7 +187,7 @@ public class HorizonServerUtilities {
     trustTransactionBuilder.addOperation(trustOperation);
 
     submitTransaction(trustingAccount, trustTransactionBuilder,
-        trustingAccountKeyPair, StellarTrustLineAdjustmentFailedException::trustLineTransactionFailed);
+        trustingAccountKeyPair, StellarTrustlineAdjustmentFailedException::trustLineTransactionFailed);
 
     return trustSize;
   }

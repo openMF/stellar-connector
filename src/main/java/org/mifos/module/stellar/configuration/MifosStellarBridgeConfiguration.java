@@ -16,7 +16,7 @@
 package org.mifos.module.stellar.configuration;
 
 import com.google.gson.Gson;
-import org.mifos.module.stellar.persistencedomain.MifosEventPersistency;
+import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -36,7 +36,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "org.mifos.module.stellar.repository"
 })
 @EntityScan(basePackageClasses = {
-    MifosEventPersistency.class
+    MifosPaymentEventPersistency.class
 })
 @ComponentScan(basePackages = {
     "org.mifos.module.stellar.service",

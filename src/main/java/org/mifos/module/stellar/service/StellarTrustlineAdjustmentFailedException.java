@@ -15,25 +15,25 @@
  */
 package org.mifos.module.stellar.service;
 
-public class StellarTrustLineAdjustmentFailedException extends RuntimeException {
-  private StellarTrustLineAdjustmentFailedException(final String message) {
+public class StellarTrustlineAdjustmentFailedException extends RuntimeException {
+  private StellarTrustlineAdjustmentFailedException(final String message) {
     super(message);
   }
 
-  public static StellarTrustLineAdjustmentFailedException needTopLevelStellarAccount
+  public static StellarTrustlineAdjustmentFailedException needTopLevelStellarAccount
       (final String address) {
-    return new StellarTrustLineAdjustmentFailedException(
+    return new StellarTrustlineAdjustmentFailedException(
         "Need top level Stellar account to create trustline: " + address);
   }
 
-  public static StellarTrustLineAdjustmentFailedException trustLineTransactionFailed() {
-    return new StellarTrustLineAdjustmentFailedException("Credit line creation failed.");
+  public static StellarTrustlineAdjustmentFailedException trustLineTransactionFailed() {
+    return new StellarTrustlineAdjustmentFailedException("Credit line creation failed.");
   }
 
-  public static StellarTrustLineAdjustmentFailedException selfReferentialVaultTrustline
+  public static StellarTrustlineAdjustmentFailedException selfReferentialVaultTrustline
       (final String stellarAddress)
   {
-    return new StellarTrustLineAdjustmentFailedException(
+    return new StellarTrustlineAdjustmentFailedException(
         "Trustline to accounts vault should be managed via vault: " + stellarAddress);
   }
 }

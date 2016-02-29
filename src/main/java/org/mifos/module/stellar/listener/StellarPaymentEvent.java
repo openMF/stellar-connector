@@ -18,26 +18,27 @@ package org.mifos.module.stellar.listener;
 import org.springframework.context.ApplicationEvent;
 
 public class StellarPaymentEvent extends ApplicationEvent {
-  private final Long stellarCursorId;
+  private final Long eventId;
   private final String mifosTenantId;
   private final String assetCode;
   private final String amount;
 
   public StellarPaymentEvent(
       final Object source,
-      final Long stellarCursorId,
+      final Long eventId,
       final String mifosTenantId,
       final String assetCode,
-      final String amount) {
+      final String amount)
+  {
     super(source);
-    this.stellarCursorId = stellarCursorId;
+    this.eventId = eventId;
     this.mifosTenantId = mifosTenantId;
     this.assetCode = assetCode;
     this.amount = amount;
   }
 
-  public Long getStellarCursorId() {
-    return stellarCursorId;
+  public Long getEventId() {
+    return eventId;
   }
 
   public String getMifosTenantId() {

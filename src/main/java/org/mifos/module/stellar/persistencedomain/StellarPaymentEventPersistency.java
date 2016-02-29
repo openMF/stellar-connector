@@ -44,6 +44,9 @@ public class StellarPaymentEventPersistency {
   @Temporal(TemporalType.TIMESTAMP)
   private Date createdOn;
 
+  @SuppressWarnings("unused")
+  public StellarPaymentEventPersistency() {}
+
   public Long getId() {
     return id;
   }
