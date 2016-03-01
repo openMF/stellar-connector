@@ -26,7 +26,6 @@ import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,7 +48,8 @@ public class TestPaymentInSimpleNetwork {
   public static final String ASSET_CODE = "XXX";
   public static final BigDecimal TRUST_LIMIT   = BigDecimal.valueOf(1000);
   public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
-  public static final int PAY_WAIT = 20000;
+  public static final int PAY_WAIT = 25000;
+
 
   @Value("${local.server.port}")
   int bridgePort;
@@ -57,23 +57,20 @@ public class TestPaymentInSimpleNetwork {
   @Value("${stellar.horizon-address}")
   String serverAddress;
 
+  static MifosStellarTestRig testRig;
+
+
 
   private Logger logger = LoggerFactory.getLogger(TestPaymentInSimpleNetwork.class.getName());
   private Cleanup testCleanup = new Cleanup();
-  private final static Cleanup suiteCleanup = new Cleanup();
   private String firstTenantId;
   private String firstTenantApiKey;
   private String secondTenantId;
   private String secondTenantApiKey;
 
   @BeforeClass
-  public static void setupSystem() throws IOException, InterruptedException {
-    final StellarDockerImage stellarDockerImage = new StellarDockerImage();
-    suiteCleanup.addStep(stellarDockerImage::close);
-
-    stellarDockerImage.waitForStartupToComplete();
-
-    System.setProperty("stellar.horizon-address", stellarDockerImage.address());
+  public static void setupSystem() throws Exception {
+    testRig = new MifosStellarTestRig();
   }
 
   @Before
@@ -81,13 +78,15 @@ public class TestPaymentInSimpleNetwork {
     RestAssured.port = bridgePort;
 
     firstTenantId = UUID.randomUUID().toString();
-    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup);
+    firstTenantApiKey = createAndDestroyBridge(
+        firstTenantId, testCleanup, testRig.getMifosAddress());
     setVaultSize(firstTenantId, firstTenantApiKey, ASSET_CODE, VAULT_BALANCE);
     final String firstTenantVaultAddress = tenantVaultStellarAddress(firstTenantId);
     logger.info("First tenant setup {} with vault size {}.", firstTenantId, VAULT_BALANCE);
 
     secondTenantId = UUID.randomUUID().toString();
-    secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup);
+    secondTenantApiKey = createAndDestroyBridge(
+        secondTenantId, testCleanup, testRig.getMifosAddress());
     setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, VAULT_BALANCE);
     final String secondTenantVaultAddress = tenantVaultStellarAddress(secondTenantId);
     logger.info("Second tenant setup {} with vault size {}.", secondTenantId, VAULT_BALANCE);
@@ -109,31 +108,7 @@ public class TestPaymentInSimpleNetwork {
 
   @AfterClass
   public static void tearDownSystem() throws Exception {
-    suiteCleanup.cleanup();
-  }
-
-  @Test
-  public void paymentHappyCase() throws Exception {
-    logger.info("paymentHappyCase test begin");
-
-    final AccountListener accountListener =
-        new AccountListener(serverAddress, secondTenantId);
-
-    final BigDecimal transferAmount = BigDecimal.TEN;
-
-    makePayment(firstTenantId, firstTenantApiKey,
-        secondTenantId,
-        ASSET_CODE, transferAmount);
-
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
-
-    if (!missingCredits.isEmpty())
-      logger.info("Missing credits: " + missingCredits);
-
-    checkBalance(secondTenantId, secondTenantApiKey,
-        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
-        transferAmount);
+    testRig.close();
   }
 
   @Test
@@ -179,7 +154,7 @@ public class TestPaymentInSimpleNetwork {
           AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
 
       if (!missingCredits.isEmpty())
-        logger.info("Missing credits: " + missingCredits);
+        logger.info("Missing credits after first payment: {}", missingCredits);
     }
 
     checkBalance(secondTenantId, secondTenantApiKey,
@@ -191,21 +166,30 @@ public class TestPaymentInSimpleNetwork {
         ASSET_CODE, transferAmount);
 
     {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*2,
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*3,
           AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
           AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
           AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
 
       if (!missingCredits.isEmpty())
-        logger.info("Missing credits: " + missingCredits);
+        logger.info("Missing credits after second payment: {}", missingCredits);
     }
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
         BigDecimal.ZERO);
+
+    checkBalance(firstTenantId, firstTenantApiKey,
+        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
+        VAULT_BALANCE);
+
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         BigDecimal.ZERO);
+
+    checkBalance(secondTenantId, secondTenantApiKey,
+        ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
+        VAULT_BALANCE);
   }
 
   @Test
@@ -225,7 +209,7 @@ public class TestPaymentInSimpleNetwork {
         firstTenantId,
         ASSET_CODE, doubleTransferAmount);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*2,
+    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*3,
         AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
         AccountListener.credit(firstTenantId, doubleTransferAmount, ASSET_CODE, secondTenantId),
         AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
@@ -239,6 +223,17 @@ public class TestPaymentInSimpleNetwork {
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         BigDecimal.ZERO);
+
+    //Return balances to zero for next test.
+    makePayment(firstTenantId, firstTenantApiKey,
+        secondTenantId,
+        ASSET_CODE, transferAmount);
+
+    final List<AccountListener.Credit> missingCredits2 = accountListener.waitForCredits(PAY_WAIT,
+        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
+
+    if (!missingCredits2.isEmpty())
+      logger.info("Missing credits: " + missingCredits);
   }
 
 
@@ -258,14 +253,33 @@ public class TestPaymentInSimpleNetwork {
         (transferAmount) -> makePayment(firstTenantId, firstTenantApiKey, secondTenantId,
             ASSET_CODE, transferAmount));
 
+    {
+      final List<AccountListener.Credit> transfers = new ArrayList<>();
+      transfers.addAll(Collections.nCopies(10,
+          AccountListener.credit(secondTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
+
+      final List<AccountListener.Credit> leftOverTransfers =
+          accountListener.waitForCredits(PAY_WAIT *5, transfers);
+
+      if (!leftOverTransfers.isEmpty())
+        logger.info("{} transfers not completed.", leftOverTransfers.size());
+    }
+
+    checkBalance(secondTenantId, secondTenantApiKey,
+        ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
+        VAULT_BALANCE);
+
+    checkBalance(secondTenantId, secondTenantApiKey,
+        ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
+        transferIncrement.multiply(BigDecimal.TEN));
+
+
     Collections.nCopies(10, transferIncrement).parallelStream().forEach(
         (transferAmount) -> makePayment(secondTenantId, secondTenantApiKey, firstTenantId,
             ASSET_CODE, transferAmount));
 
     {
       final List<AccountListener.Credit> transfers = new ArrayList<>();
-      transfers.addAll(Collections.nCopies(10,
-          AccountListener.credit(secondTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
       transfers.addAll(Collections.nCopies(10,
           AccountListener.credit(firstTenantId, transferIncrement, ASSET_CODE, secondTenantId)));
       transfers.addAll(Collections.nCopies(10,
@@ -275,10 +289,10 @@ public class TestPaymentInSimpleNetwork {
 
 
       final List<AccountListener.Credit> leftOverTransfers =
-          accountListener.waitForCredits(PAY_WAIT *5, transfers);
+          accountListener.waitForCredits(PAY_WAIT *15, transfers);
 
       if (!leftOverTransfers.isEmpty())
-        logger.info("Not all transfers completed.");
+        logger.info("{} transfers not completed.", leftOverTransfers.size());
     }
 
     checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -319,15 +333,26 @@ public class TestPaymentInSimpleNetwork {
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         TRUST_LIMIT);
+
+    //Zero out balance for next test.
+    makePayment(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, TRUST_LIMIT);
+    {
+      final List<AccountListener.Credit> leftOverTransfers= accountListener.waitForCredits(PAY_WAIT,
+          AccountListener.credit(firstTenantId, TRUST_LIMIT, ASSET_CODE, secondTenantId));
+
+      if (!leftOverTransfers.isEmpty())
+        logger.info("Not all transfers completed.");
+    }
   }
 
   //TODO: test transferring to a user account.
   //TODO: add a test for transferring XLM.
-  //TODO: add a test with enough pages to provoke paging.
+  //TODO: add a test with enough paths to provoke paging in find path pay.
   //TODO: add a test for installation balance.
   //TODO: add a test for simple balance.
   //TODO: add a test with a mock for external federation containing external domain addresses.
   //TODO: add a test which pays to an invalid stellar address.
   //TODO: still needed a test which stops and starts the bridge component, but makes transactions
   //TODO: against Stellar while the bridge component is down.
+  //TODO: test for invalid parameters to create bridge.
 }

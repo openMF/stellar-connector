@@ -27,13 +27,11 @@ import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.*;
-import static org.mifos.module.stellar.StellarBridgeTestHelpers.createAndDestroyBridge;
 import static org.mifos.module.stellar.StellarBridgeTestHelpers.createAndDestroyTrustLine;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -58,10 +56,11 @@ public class TestPaymentInIncompleteNetwork {
   @Value("${stellar.horizon-address}")
   String serverAddress;
 
+  static MifosStellarTestRig testRig;
+
 
   private Logger logger = LoggerFactory.getLogger(TestPaymentInSimpleNetwork.class.getName());
   private Cleanup testCleanup = new Cleanup();
-  private final static Cleanup suiteCleanup = new Cleanup();
   private String firstTenantId;
   private String firstTenantApiKey;
   private String secondTenantId;
@@ -70,13 +69,8 @@ public class TestPaymentInIncompleteNetwork {
   private String thirdTenantApiKey;
 
   @BeforeClass
-  public static void setupSystem() throws IOException, InterruptedException {
-    final StellarDockerImage stellarDockerImage = new StellarDockerImage();
-    suiteCleanup.addStep(stellarDockerImage::close);
-
-    stellarDockerImage.waitForStartupToComplete();
-
-    System.setProperty("stellar.horizon-address", stellarDockerImage.address());
+  public static void setupSystem() throws Exception {
+    testRig = new MifosStellarTestRig();
   }
 
   @Before
@@ -84,19 +78,19 @@ public class TestPaymentInIncompleteNetwork {
     RestAssured.port = bridgePort;
 
     firstTenantId = UUID.randomUUID().toString();
-    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup);
+    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup, testRig.getMifosAddress());
     setVaultSize(firstTenantId, firstTenantApiKey, ASSET_CODE, VAULT_BALANCE);
     final String firstTenantVaultAddress = tenantVaultStellarAddress(firstTenantId);
     logger.info("First tenant setup {} with vault size {}.", firstTenantId, VAULT_BALANCE);
 
     secondTenantId = UUID.randomUUID().toString();
-    secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup);
+    secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup, testRig.getMifosAddress());
     setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, VAULT_BALANCE);
     final String secondTenantVaultAddress = tenantVaultStellarAddress(secondTenantId);
     logger.info("Second tenant setup {} with vault size {}.", secondTenantId, VAULT_BALANCE);
 
     thirdTenantId = UUID.randomUUID().toString();
-    thirdTenantApiKey = createAndDestroyBridge(thirdTenantId, testCleanup);
+    thirdTenantApiKey = createAndDestroyBridge(thirdTenantId, testCleanup, testRig.getMifosAddress());
     logger.info("Third tenant setup {} without vault.", thirdTenantId);
 
 
@@ -120,7 +114,7 @@ public class TestPaymentInIncompleteNetwork {
 
   @AfterClass
   public static void tearDownSystem() throws Exception {
-    suiteCleanup.cleanup();
+    testRig.close();
   }
 
   @Test

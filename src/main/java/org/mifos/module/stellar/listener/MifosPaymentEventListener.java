@@ -19,6 +19,12 @@ import org.mifos.module.stellar.federation.FederationFailedException;
 import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAccountId;
 import org.mifos.module.stellar.federation.StellarAddress;
+import org.mifos.module.stellar.fineractadapter.MifosClientService;
+import org.mifos.module.stellar.fineractadapter.RestAdapterProvider;
+import org.mifos.module.stellar.horizonadapter.HorizonServerUtilities;
+import org.mifos.module.stellar.horizonadapter.InvalidConfigurationException;
+import org.mifos.module.stellar.horizonadapter.StellarPaymentFailedException;
+import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.repository.MifosPaymentEventRepository;
@@ -29,6 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
+import retrofit.RestAdapter;
+import retrofit.RetrofitError;
 
 import java.util.Date;
 
@@ -39,6 +47,7 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
   private final MifosPaymentEventRepository mifosPaymentEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
+  private final RestAdapterProvider restAdapterProvider;
   private final Logger logger;
   private final ValueSynchronizer<Long> retrySynchronizer;
 
@@ -49,11 +58,13 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
       final MifosPaymentEventRepository mifosPaymentEventRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
+      final RestAdapterProvider restAdapterProvider,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.mifosPaymentEventRepository = mifosPaymentEventRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
+    this.restAdapterProvider = restAdapterProvider;
     this.logger = logger;
     this.retrySynchronizer = new ValueSynchronizer<>();
   }
@@ -75,9 +86,19 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
       eventSource.setLastModifiedOn(new Date());
       this.mifosPaymentEventRepository.save(eventSource);
 
+
+
       final PaymentPersistency paymentPayload = event.getPayload();
 
+      final AccountBridgePersistency bridge =
+          accountBridgeRepositoryDecorator.getBridge(paymentPayload.sourceTenantId);
+
+
+      final RestAdapter restAdapter = this.restAdapterProvider.get(bridge.getEndpoint());
+
       try {
+        final MifosClientService clientService = restAdapter.create(MifosClientService.class);
+
         final StellarAccountId targetAccountId;
         targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(
             StellarAddress.forTenant(paymentPayload.targetAccount, paymentPayload.sinkDomain));
@@ -98,14 +119,14 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
       }
       catch (
           final InvalidConfigurationException |
-          StellarPaymentFailedException |
-          FederationFailedException ex)
+              StellarPaymentFailedException |
+              FederationFailedException |
+              RetrofitError ex)
       {
         eventSource.setProcessed(Boolean.FALSE);
         eventSource.setErrorMessage(ex.getMessage());
-        if (outstandingRetries == 1) {
-          logger.error("Last payment attempt failed because: {}", ex.getMessage());
-        }
+        logger.error("Payment attempt failed because \"{}\", retries remaining: {}",
+            ex.getMessage(), outstandingRetries);
       }
       catch (final InvalidStellarAddressException ex)
       {

@@ -23,4 +23,6 @@ import org.springframework.stereotype.Repository;
 public interface AccountBridgeKeyRepository
     extends CrudRepository<AccountBridgeKeyPersistency, Long> {
   AccountBridgeKeyPersistency findByMifosTenantId(final String mifosTenantId);
+
+  Long deleteByMifosTenantId(String mifosTenantId);
 }

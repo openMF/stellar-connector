@@ -21,13 +21,19 @@ public class AccountBridgeConfiguration {
 
   private String mifosToken;
 
+  private String endpoint;
+
   @SuppressWarnings("unused") //needed for Json Mapping.
   AccountBridgeConfiguration() {super();}
 
-  public AccountBridgeConfiguration(final String mifosTenantId, final String mifosToken)
+  public AccountBridgeConfiguration(
+      final String mifosTenantId,
+      final String mifosToken,
+      final String endpoint)
   {
     this.mifosTenantId = mifosTenantId;
     this.mifosToken = mifosToken;
+    this.endpoint = endpoint;
   }
 
   public String getMifosTenantId() {
@@ -37,4 +43,6 @@ public class AccountBridgeConfiguration {
   public String getMifosToken() {
     return mifosToken;
   }
+
+  public String getEndpoint() { return endpoint; }
 }

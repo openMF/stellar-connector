@@ -27,7 +27,6 @@ import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -51,34 +50,24 @@ public class TestCreateTrustLine {
   @Value("${local.server.port}")
   int bridgePort;
 
+
+  static MifosStellarTestRig testRig;
+
   private Cleanup testCleanup = new Cleanup();
-  private final static Cleanup suiteCleanup = new Cleanup();
   private String firstTenantId;
   private String firstTenantApiKey;
-  private String secondTenantId;
-  private String secondTenantApiKey;
 
   @BeforeClass
-  public static void setupSystem() throws IOException, InterruptedException {
-    final StellarDockerImage stellarDockerImage = new StellarDockerImage();
-    suiteCleanup.addStep(stellarDockerImage::close);
-
-    stellarDockerImage.waitForStartupToComplete();
-
-    System.setProperty("stellar.horizon-address", stellarDockerImage.address());
+  public static void setupSystem() throws Exception {
+    testRig = new MifosStellarTestRig();
   }
 
   @Before
   public void setupTest() {
     RestAssured.port = bridgePort;
-    RestAssured.enableLoggingOfRequestAndResponseIfValidationFails();
 
-    firstTenantId = UUID.randomUUID().toString();
-    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup);
-
-    secondTenantId = UUID.randomUUID().toString();
-    secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup);
-    setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.TEN);
+    firstTenantId = "default";
+    firstTenantApiKey = createAndDestroyBridge(firstTenantId, testCleanup, testRig.getMifosAddress());
   }
 
   @After
@@ -88,7 +77,7 @@ public class TestCreateTrustLine {
 
   @AfterClass
   public static void tearDownSystem() throws Exception {
-    suiteCleanup.cleanup();
+    testRig.close();
   }
 
   @Test
@@ -96,15 +85,10 @@ public class TestCreateTrustLine {
     final TrustLineConfiguration trustLine =
         new TrustLineConfiguration(BigDecimal.valueOf(100));
 
-    String issuer = "";
-    try {
-      issuer = URLEncoder.encode(tenantVaultStellarAddress(secondTenantId), "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      Assert.fail();
-    }
+    String issuer = "blub";
 
     given().header(CONTENT_TYPE_HEADER)
-        .header(API_KEY_HEADER_LABEL, secondTenantApiKey) //Key doesn't match tenant.
+        .header(API_KEY_HEADER_LABEL, "wrong_key")
         .header(TENANT_ID_HEADER_LABEL, firstTenantId)
         .pathParameter("assetCode", ASSET_CODE)
         .pathParameter("issuer", issuer)
@@ -136,6 +120,9 @@ public class TestCreateTrustLine {
 
   @Test
   public void createTrustLineHappyCase() {
+    final String secondTenantId = UUID.randomUUID().toString();
+    final String secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup, testRig.getMifosAddress());
+    setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.TEN);
 
     final String secondTenantStellarAddress = tenantVaultStellarAddress(secondTenantId);
 

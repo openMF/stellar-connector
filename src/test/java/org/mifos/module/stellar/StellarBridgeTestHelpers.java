@@ -17,8 +17,10 @@ package org.mifos.module.stellar;
 
 import com.google.gson.Gson;
 import com.jayway.restassured.internal.mapper.ObjectMapperType;
+import com.jayway.restassured.path.json.JsonPath;
 import com.jayway.restassured.response.Header;
 import com.jayway.restassured.response.Response;
+import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
 import org.mifos.module.stellar.restdomain.*;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,8 @@ import java.net.URLEncoder;
 import java.util.Optional;
 
 import static com.jayway.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mifos.module.stellar.AccountBalanceMatcher.balanceMatches;
 
 public class StellarBridgeTestHelpers {
@@ -47,16 +51,18 @@ public class StellarBridgeTestHelpers {
   /**
    * @return the api key used when accessing the tenantName
    */
-  public static String createAndDestroyBridge(final String tenantName, final Cleanup testCleanup)
+  public static String createAndDestroyBridge(final String tenantName, final Cleanup testCleanup,
+      final String endpoint)
   {
-    final String apiKey = createBridge(tenantName);
+    final String apiKey = createBridge(tenantName, endpoint);
     testCleanup.addStep(() -> deleteBridge(tenantName, apiKey));
     return apiKey;
   }
 
-  private static String createBridge(final String tenantName) {
+  private static String createBridge(final String tenantName, final String mifosAddress)
+  {
     final AccountBridgeConfiguration newAccount =
-        new AccountBridgeConfiguration(tenantName, "token_" + tenantName);
+        new AccountBridgeConfiguration(tenantName, getTenantToken(tenantName, mifosAddress), mifosAddress);
     final Response creationResponse =
         given()
             .header(CONTENT_TYPE_HEADER)
@@ -67,6 +73,23 @@ public class StellarBridgeTestHelpers {
         .then().assertThat().statusCode(HttpStatus.CREATED.value());
 
     return creationResponse.getBody().as(String.class, ObjectMapperType.GSON);
+  }
+
+  private static String getTenantToken(final String tenantName, final String mifosAddress) {
+    final String encodedTenantName;
+    try {
+      encodedTenantName = URLEncoder.encode(tenantName, "UTF-8");
+    } catch (UnsupportedEncodingException ignore) {
+      throw new RuntimeException("unexpected error.");
+    }
+    final String LOGIN_URL = "/fineract-provider/api/v1/authentication?username=mifos&password=password&tenantIdentifier=" + encodedTenantName;
+
+    final String json = given().baseUri(mifosAddress).post(LOGIN_URL).asString();
+
+    assertThat("Failed to login into fineract platform", StringUtils.isBlank(json), is(false));
+    final String ret = JsonPath.with(json).get("base64EncodedAuthenticationKey");
+    assertThat("Failed to acquire a tenant token", StringUtils.isBlank(ret), is(false));
+    return ret;
   }
 
   public static void deleteBridge(final String tenantName, final String apiKey)
@@ -270,7 +293,7 @@ public class StellarBridgeTestHelpers {
   }
 
 
-  static String getPaymentPayload(
+  private static String getPaymentPayload(
       final String assetCode,
       final BigDecimal amount,
       final String toDomain,

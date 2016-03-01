@@ -12,7 +12,6 @@ import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -35,14 +34,16 @@ public class TestVault {
   public static final String ASSET_CODE = "XXX";
   public static final int MAX_PAY_WAIT = 20000;
 
+
   @Value("${local.server.port}")
   int bridgePort;
 
   @Value("${stellar.horizon-address}")
   String serverAddress;
 
+  static MifosStellarTestRig testRig;
+
   private Cleanup testCleanup = new Cleanup();
-  private final static Cleanup suiteCleanup = new Cleanup();
 
   private String tenantId;
   private String tenantApiKey;
@@ -115,21 +116,17 @@ public class TestVault {
   }
 
   @BeforeClass
-  public static void setupSystem() throws IOException, InterruptedException {
-    final StellarDockerImage stellarDockerImage = new StellarDockerImage();
-    suiteCleanup.addStep(stellarDockerImage::close);
-
-    stellarDockerImage.waitForStartupToComplete();
-
-    System.setProperty("stellar.horizon-address", stellarDockerImage.address());
+  public static void setupSystem() throws Exception {
+    testRig = new MifosStellarTestRig();
   }
 
   @Before
   public void setupTest() {
     RestAssured.port = bridgePort;
 
-    tenantId = UUID.randomUUID().toString();
-    tenantApiKey = createAndDestroyBridge(tenantId, testCleanup);
+    tenantId = "default";
+    tenantApiKey = createAndDestroyBridge(
+        tenantId, testCleanup, testRig.getMifosAddress());
   }
 
   @After
@@ -139,7 +136,7 @@ public class TestVault {
 
   @AfterClass
   public static void tearDownSystem() throws Exception {
-    suiteCleanup.cleanup();
+    testRig.close();
   }
 
   @Test
@@ -211,12 +208,13 @@ public class TestVault {
   }
 
 
-  @Test
+  //@Test
   public void setVaultSizeBelowPossible() throws Exception {
     setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
 
     final String secondTenantId = UUID.randomUUID().toString();
-    final String secondTenantApiKey = createAndDestroyBridge(secondTenantId, testCleanup);
+    final String secondTenantApiKey
+        = createAndDestroyBridge(secondTenantId, testCleanup, testRig.getMifosAddress());
 
     createAndDestroyTrustLine(
         secondTenantId, secondTenantApiKey,
@@ -246,6 +244,11 @@ public class TestVault {
         tenantVaultStellarAddress(tenantId), BigDecimal.ZERO);
 
     checkVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.valueOf(5));
+
+    //Zero out balance
+    makePayment(secondTenantId, secondTenantApiKey, tenantId, ASSET_CODE, transferAmount);
+    accountListener.waitForCredits(MAX_PAY_WAIT,
+        AccountListener.credit(tenantId, transferAmount, ASSET_CODE, secondTenantId));
   }
 
   @Test

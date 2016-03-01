@@ -19,6 +19,9 @@ import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.FederationFailedException;
 import org.mifos.module.stellar.federation.InvalidStellarAddressException;
 import org.mifos.module.stellar.federation.StellarAddress;
+import org.mifos.module.stellar.horizonadapter.InvalidConfigurationException;
+import org.mifos.module.stellar.horizonadapter.StellarAccountCreationFailedException;
+import org.mifos.module.stellar.horizonadapter.StellarTrustlineAdjustmentFailedException;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.restdomain.AccountBridgeConfiguration;
 import org.mifos.module.stellar.restdomain.AmountConfiguration;
@@ -29,6 +32,7 @@ import org.mifos.module.stellar.service.SecurityException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.UnsupportedEncodingException;
@@ -61,20 +65,32 @@ public class StellarBridgeController {
 
   @RequestMapping(value = "", method = RequestMethod.POST,
                   consumes = {"application/json"}, produces = {"application/json"})
+  @Transactional
   public ResponseEntity<String> createStellarBridgeConfiguration(
       @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
   {
-    final String mifosTenantId = stellarBridgeConfig.getMifosTenantId();
-    final String newApiKey = this.securityService.generateApiKey(mifosTenantId);
+    if (stellarBridgeConfig.getMifosTenantId() == null ||
+        stellarBridgeConfig.getMifosToken() == null ||
+        stellarBridgeConfig.getEndpoint() == null)
+    {
+      return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+    }
+
+    final String newApiKey
+        = this.securityService.generateApiKey(stellarBridgeConfig.getMifosTenantId());
+
     stellarBridgeService.createStellarBridgeConfig(
         stellarBridgeConfig.getMifosTenantId(),
-        stellarBridgeConfig.getMifosToken());
+        stellarBridgeConfig.getMifosToken(),
+        stellarBridgeConfig.getEndpoint());
+
 
     return new ResponseEntity<>(newApiKey, HttpStatus.CREATED);
   }
 
   @RequestMapping(value = "", method = RequestMethod.DELETE,
       produces = {"application/json"})
+  @Transactional
   public ResponseEntity<Void> deleteAccountBridgeConfiguration(
       @RequestHeader(API_KEY_HEADER_LABEL) final String apiKey,
       @RequestHeader(TENANT_ID_HEADER_LABEL) final String mifosTenantId)

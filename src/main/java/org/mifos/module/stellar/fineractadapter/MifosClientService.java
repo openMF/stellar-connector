@@ -23,9 +23,4 @@ public interface MifosClientService {
   Client findClient(@Header("Authorization") String authorization,
       @Header("X-Mifos-Platform-TenantId") String tenantIdentifier,
       @Path("id") final long id);
-
-  @POST("/authentication")
-  AuthenticationResponse logon(@Header("X-Mifos-Platform-TenantId") final String tenantIdentifier,
-      @Query("username") final String username,
-      @Query("password") final String password);
 }

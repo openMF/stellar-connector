@@ -82,8 +82,7 @@ public class SecurityService {
     }
   }
 
-  @SuppressWarnings("unused")
   public void removeApiKey(final String mifosTenantId) {
-    //TODO:
+    accountBridgeKeyRepository.deleteByMifosTenantId(mifosTenantId);
   }
 }

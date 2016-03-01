@@ -16,6 +16,7 @@
 package org.mifos.module.stellar.service;
 import com.google.gson.Gson;
 import org.mifos.module.stellar.federation.*;
+import org.mifos.module.stellar.horizonadapter.*;
 import org.mifos.module.stellar.listener.MifosPaymentEvent;
 import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
@@ -75,7 +76,8 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
    */
   public void createStellarBridgeConfig(
       final String mifosTenantId,
-      final String mifosToken)
+      final String mifosToken,
+      final String endpoint)
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final KeyPair accountKeyPair = horizonServerUtilities.createAccount();
@@ -84,7 +86,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
         StellarAccountId.mainAccount(accountKeyPair.getAccountId()));
 
     this.accountBridgeRepositoryDecorator.save(
-        mifosTenantId, mifosToken, accountKeyPair);
+        mifosTenantId, mifosToken, accountKeyPair, endpoint);
   }
 
   /**

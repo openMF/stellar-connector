@@ -42,6 +42,9 @@ public class AccountBridgePersistency {
   @Column(name = "stellar_vault_account_private_key")
   private char[] stellarVaultAccountPrivateKey;
 
+  @Column(name = "endpoint")
+  private String endpoint;
+
   @SuppressWarnings("unused")
   public AccountBridgePersistency() {}
 
@@ -49,13 +52,15 @@ public class AccountBridgePersistency {
       final String mifosTenantId,
       final String mifosToken,
       final String stellarAccountId,
-      final char[] stellarAccountPrivateKey) {
+      final char[] stellarAccountPrivateKey,
+      final String endpoint) {
     this.mifosTenantId = mifosTenantId;
     this.mifosToken = mifosToken;
     this.stellarAccountId = stellarAccountId;
     this.stellarAccountPrivateKey = stellarAccountPrivateKey;
     stellarVaultAccountId = null;
     stellarVaultAccountPrivateKey = null;
+    this.endpoint = endpoint;
   }
 
   public void setStellarVaultAccountId(final String stellarVaultAccountId) {
@@ -78,6 +83,10 @@ public class AccountBridgePersistency {
     return mifosToken;
   }
 
+  public String getEndpoint() {
+    return endpoint;
+  }
+
   public String getStellarAccountId() {
     return stellarAccountId;
   }
@@ -91,5 +100,4 @@ public class AccountBridgePersistency {
   public char[] getStellarVaultAccountPrivateKey() {
     return stellarVaultAccountPrivateKey;
   }
-
 }
