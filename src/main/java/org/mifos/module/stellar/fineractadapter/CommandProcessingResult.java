@@ -15,18 +15,20 @@
  */
 package org.mifos.module.stellar.fineractadapter;
 
+import java.util.Map;
 
-import retrofit.http.*;
-
-public interface MifosClientService {
-  @GET("/clients/{id}")
-  Client findClient(@Header("Authorization") String authorization,
-      @Header("X-Mifos-Platform-TenantId") String tenantIdentifier,
-      @Path("id") final long id);
-
-  @POST("/savingsaccounts/{accountId}/transactions")
-  CommandProcessingResult createSavingsAccountTransaction(
-      @Path("accountId") int accountId,
-      @Query("command") String command,
-      @Body JournalEntryCommand journalEntryCommand);
+public class CommandProcessingResult {
+  public Long commandId;
+  public Long officeId;
+  public Long groupId;
+  public Long clientId;
+  public Long loanId;
+  public Long savingsId;
+  public Long resourceId;
+  public Long subResourceId;
+  public String transactionId;
+  public Map<String, Object> changes;
+  public String resourceIdentifier;
+  public Long productId;
+  public Boolean rollbackTransaction;
 }

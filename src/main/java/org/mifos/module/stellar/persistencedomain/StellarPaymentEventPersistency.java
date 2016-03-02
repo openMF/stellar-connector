@@ -16,6 +16,7 @@
 package org.mifos.module.stellar.persistencedomain;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Entity
@@ -32,7 +33,7 @@ public class StellarPaymentEventPersistency {
   private String assetCode;
 
   @Column(name = "amount")
-  private String amount;
+  private BigDecimal amount;
 
   @Column(name = "processed")
   private Boolean processed;
@@ -71,11 +72,11 @@ public class StellarPaymentEventPersistency {
     this.assetCode = assetCode;
   }
 
-  public String getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 
-  public void setAmount(String amount) {
+  public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 

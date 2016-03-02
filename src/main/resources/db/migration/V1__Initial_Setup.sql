@@ -14,6 +14,7 @@ CREATE TABLE stellar_account_bridge (
   INCREMENT BY 1 )                                                               NOT NULL,
   mifos_tenant_id                   VARCHAR(40)                                  NOT NULL,
   mifos_token                       VARCHAR(256)                                 NOT NULL,
+  mifos_staging_account             VARCHAR(60)                                  NOT NULL,
   endpoint                          VARCHAR(256)                                 NOT NULL,
   stellar_account_id                VARCHAR(60)                                  NOT NULL,
   stellar_account_private_key       VARCHAR(60)                                  NOT NULL,

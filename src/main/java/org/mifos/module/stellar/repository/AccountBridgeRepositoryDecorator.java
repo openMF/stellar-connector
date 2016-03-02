@@ -85,12 +85,14 @@ public class AccountBridgeRepositoryDecorator {
       final String mifosTenantId,
       final String mifosToken,
       final KeyPair accountKeyPair,
-      final String endpoint)
+      final String endpoint,
+      final String mifosStagingAccount)
   {
     final AccountBridgePersistency accountBridge =
         new AccountBridgePersistency(
             mifosTenantId,
             mifosToken,
+            mifosStagingAccount,
             accountKeyPair.getAccountId(),
             accountKeyPair.getSecretSeed(),
             endpoint);

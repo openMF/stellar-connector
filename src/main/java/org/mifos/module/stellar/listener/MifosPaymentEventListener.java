@@ -15,12 +15,9 @@
  */
 package org.mifos.module.stellar.listener;
 
-import org.mifos.module.stellar.federation.FederationFailedException;
-import org.mifos.module.stellar.federation.InvalidStellarAddressException;
-import org.mifos.module.stellar.federation.StellarAccountId;
-import org.mifos.module.stellar.federation.StellarAddress;
-import org.mifos.module.stellar.fineractadapter.MifosClientService;
-import org.mifos.module.stellar.fineractadapter.RestAdapterProvider;
+import org.mifos.module.stellar.federation.*;
+import org.mifos.module.stellar.fineractadapter.MifosBridgeAccountAdjuster;
+import org.mifos.module.stellar.fineractadapter.MifosBridgeAccountAdjustmentFailedException;
 import org.mifos.module.stellar.horizonadapter.HorizonServerUtilities;
 import org.mifos.module.stellar.horizonadapter.InvalidConfigurationException;
 import org.mifos.module.stellar.horizonadapter.StellarPaymentFailedException;
@@ -28,15 +25,12 @@ import org.mifos.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.mifos.module.stellar.persistencedomain.MifosPaymentEventPersistency;
 import org.mifos.module.stellar.persistencedomain.PaymentPersistency;
 import org.mifos.module.stellar.repository.MifosPaymentEventRepository;
-import org.mifos.module.stellar.service.*;
 import org.mifos.module.stellar.repository.AccountBridgeRepositoryDecorator;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
-import retrofit.RestAdapter;
-import retrofit.RetrofitError;
 
 import java.util.Date;
 
@@ -47,7 +41,7 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
   private final MifosPaymentEventRepository mifosPaymentEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
-  private final RestAdapterProvider restAdapterProvider;
+  private final MifosBridgeAccountAdjuster mifosBridgeAccountAdjuster;
   private final Logger logger;
   private final ValueSynchronizer<Long> retrySynchronizer;
 
@@ -58,13 +52,13 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
       final MifosPaymentEventRepository mifosPaymentEventRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
-      final RestAdapterProvider restAdapterProvider,
+      final MifosBridgeAccountAdjuster mifosBridgeAccountAdjuster,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.mifosPaymentEventRepository = mifosPaymentEventRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
-    this.restAdapterProvider = restAdapterProvider;
+    this.mifosBridgeAccountAdjuster = mifosBridgeAccountAdjuster;
     this.logger = logger;
     this.retrySynchronizer = new ValueSynchronizer<>();
   }
@@ -87,18 +81,15 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
       this.mifosPaymentEventRepository.save(eventSource);
 
 
-
       final PaymentPersistency paymentPayload = event.getPayload();
 
       final AccountBridgePersistency bridge =
           accountBridgeRepositoryDecorator.getBridge(paymentPayload.sourceTenantId);
 
 
-      final RestAdapter restAdapter = this.restAdapterProvider.get(bridge.getEndpoint());
 
-      try {
-        final MifosClientService clientService = restAdapter.create(MifosClientService.class);
-
+      try
+      {
         final StellarAccountId targetAccountId;
         targetAccountId =  stellarAddressResolver.getAccountIdOfStellarAccount(
             StellarAddress.forTenant(paymentPayload.targetAccount, paymentPayload.sinkDomain));
@@ -111,17 +102,22 @@ public class MifosPaymentEventListener implements ApplicationListener<MifosPayme
             paymentPayload.amount, paymentPayload.assetCode,
             decodedStellarPrivateKey);
 
+        eventSource.setOutstandingRetries(0); //Set retries to 0 before telling Mifos, in case something goes wrong.
+        this.mifosPaymentEventRepository.save(eventSource);
+
+        mifosBridgeAccountAdjuster.tellMifosPaymentSucceeded(bridge.getEndpoint(),
+            bridge.getMifosStagingAccount(), event.getEventId(), paymentPayload.assetCode,
+            paymentPayload.amount);
+
         eventSource.setProcessed(Boolean.TRUE);
         eventSource.setErrorMessage("");
-        eventSource.setOutstandingRetries(0);
         logger.info("Horizon payment processed.");
-        //TODO: adjust mifos balance
       }
       catch (
           final InvalidConfigurationException |
               StellarPaymentFailedException |
               FederationFailedException |
-              RetrofitError ex)
+              MifosBridgeAccountAdjustmentFailedException ex)
       {
         eventSource.setProcessed(Boolean.FALSE);
         eventSource.setErrorMessage(ex.getMessage());

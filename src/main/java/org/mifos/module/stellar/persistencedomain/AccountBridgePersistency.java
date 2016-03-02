@@ -30,6 +30,9 @@ public class AccountBridgePersistency {
   @Column(name = "mifos_token")
   private String mifosToken;
 
+  @Column(name = "mifos_staging_account")
+  private String mifosStagingAccount;
+
   @Column(name = "stellar_account_id")
   private String stellarAccountId;
 
@@ -51,11 +54,13 @@ public class AccountBridgePersistency {
   public AccountBridgePersistency(
       final String mifosTenantId,
       final String mifosToken,
+      final String mifosStagingAccount,
       final String stellarAccountId,
       final char[] stellarAccountPrivateKey,
       final String endpoint) {
     this.mifosTenantId = mifosTenantId;
     this.mifosToken = mifosToken;
+    this.mifosStagingAccount = mifosStagingAccount;
     this.stellarAccountId = stellarAccountId;
     this.stellarAccountPrivateKey = stellarAccountPrivateKey;
     stellarVaultAccountId = null;
@@ -81,6 +86,10 @@ public class AccountBridgePersistency {
 
   public String getMifosToken() {
     return mifosToken;
+  }
+
+  public String getMifosStagingAccount() {
+    return mifosStagingAccount;
   }
 
   public String getEndpoint() {

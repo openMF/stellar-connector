@@ -17,18 +17,20 @@ package org.mifos.module.stellar.listener;
 
 import org.springframework.context.ApplicationEvent;
 
+import java.math.BigDecimal;
+
 public class StellarPaymentEvent extends ApplicationEvent {
   private final Long eventId;
   private final String mifosTenantId;
   private final String assetCode;
-  private final String amount;
+  private final BigDecimal amount;
 
   public StellarPaymentEvent(
       final Object source,
       final Long eventId,
       final String mifosTenantId,
       final String assetCode,
-      final String amount)
+      final BigDecimal amount)
   {
     super(source);
     this.eventId = eventId;
@@ -49,7 +51,7 @@ public class StellarPaymentEvent extends ApplicationEvent {
     return assetCode;
   }
 
-  public String getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 }

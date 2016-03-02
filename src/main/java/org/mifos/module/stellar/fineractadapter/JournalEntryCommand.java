@@ -16,17 +16,27 @@
 package org.mifos.module.stellar.fineractadapter;
 
 
-import retrofit.http.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
-public interface MifosClientService {
-  @GET("/clients/{id}")
-  Client findClient(@Header("Authorization") String authorization,
-      @Header("X-Mifos-Platform-TenantId") String tenantIdentifier,
-      @Path("id") final long id);
+public class JournalEntryCommand {
 
-  @POST("/savingsaccounts/{accountId}/transactions")
-  CommandProcessingResult createSavingsAccountTransaction(
-      @Path("accountId") int accountId,
-      @Query("command") String command,
-      @Body JournalEntryCommand journalEntryCommand);
+  public Long officeId;
+  public LocalDate transactionDate;
+  public String currencyCode;
+  public String comments;
+  public String referenceNumber;
+  public Long accountingRuleId;
+  public BigDecimal amount;
+  public Long paymentTypeId;
+  public String accountNumber;
+  public String checkNumber;
+  public String receiptNumber;
+  public String bankNumber;
+  public String routingCode;
+
+  public BigDecimal transactionAmount;
+
+  public JournalEntryCommand() {
+  }
 }

@@ -35,6 +35,7 @@ import org.stellar.sdk.responses.effects.AccountCreditedEffectResponse;
 import org.stellar.sdk.responses.effects.AccountDebitedEffectResponse;
 import org.stellar.sdk.responses.effects.EffectResponse;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.Optional;
 
@@ -105,7 +106,8 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
       if (toAccount == null)
         return; //Nothing to do.  Not one of ours.
 
-      final String amount = accountCreditedEffect.getAmount();
+      final BigDecimal amount
+          = StellarAccountHelpers.stellarBalanceToBigDecimal(accountCreditedEffect.getAmount());
       final Asset asset = accountCreditedEffect.getAsset();
       final String assetCode = StellarAccountHelpers.getAssetCode(asset);
       final String issuer = StellarAccountHelpers.getIssuer(asset);
@@ -142,7 +144,8 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
       if (toAccount == null)
         return; //Nothing to do.  Not one of ours.
 
-      final String amount = accountDebitedEffect.getAmount();
+      final BigDecimal amount
+          = StellarAccountHelpers.stellarBalanceToBigDecimal(accountDebitedEffect.getAmount());
       final Asset asset = accountDebitedEffect.getAsset();
       final String assetCode = StellarAccountHelpers.getAssetCode(asset);
       final String issuer = StellarAccountHelpers.getIssuer(asset);
@@ -178,7 +181,7 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
   private Long savePaymentEvent(
       final String mifosTenantId,
       final String assetCode,
-      final String amount) {
+      final BigDecimal amount) {
     final StellarPaymentEventPersistency eventSource = new StellarPaymentEventPersistency();
     eventSource.setMifosTenantId(mifosTenantId);
     eventSource.setAssetCode(assetCode);

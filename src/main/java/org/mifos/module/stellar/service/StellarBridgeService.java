@@ -85,8 +85,10 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
     horizonServerPaymentObserver.setupListeningForAccount(
         StellarAccountId.mainAccount(accountKeyPair.getAccountId()));
 
+    final String mifosStangingAccount = "placeholder"; //TODO
+
     this.accountBridgeRepositoryDecorator.save(
-        mifosTenantId, mifosToken, accountKeyPair, endpoint);
+        mifosTenantId, mifosToken, accountKeyPair, endpoint, mifosStangingAccount);
   }
 
   /**
@@ -125,7 +127,7 @@ public class StellarBridgeService implements ApplicationEventPublisherAware {
         accountIdOfStellarAccountToTrust, assetCode, maximumAmount);
   }
 
-  private StellarAccountId getTopLevelStellarAccountId(StellarAddress stellarAddressToTrust)
+  private StellarAccountId getTopLevelStellarAccountId(final StellarAddress stellarAddressToTrust)
       throws FederationFailedException, StellarTrustlineAdjustmentFailedException
   {
     final StellarAccountId accountIdOfStellarAccountToTrust =
