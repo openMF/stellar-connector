@@ -51,8 +51,14 @@ public class HorizonSequencer {
 
     final SubmitTransactionResponse transactionResponse = server.submitTransaction(transaction);
     if (!transactionResponse.isSuccess()) {
-      logger.info("Stellar transaction failed, request: {}", transactionResponse.getExtras().getEnvelopeXdr());
-      logger.info("Stellar transaction failed, response: {}", transactionResponse.getExtras().getResultXdr());
+      if (transactionResponse.getExtras() != null) {
+        logger.info("Stellar transaction failed, request: {}", transactionResponse.getExtras().getEnvelopeXdr());
+        logger.info("Stellar transaction failed, response: {}", transactionResponse.getExtras().getResultXdr());
+      }
+      else
+      {
+        logger.info("Stellar transaction failed.  No extra information available.");
+      }
       //TODO: resend transaction if you get a bad sequence.
           /*Thread.sleep(6000); //Wait for ledger to close.
           Long sequenceNumberShouldHaveBeen =
