@@ -60,6 +60,7 @@ public class StellarCursorPersistency {
     return createdOn;
   }
 
+  @SuppressWarnings("unused")
   public void setCreatedOn(final Date createdOn) {
     this.createdOn = createdOn;
   }

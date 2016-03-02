@@ -119,6 +119,7 @@ public class FineractPaymentEventListener implements ApplicationListener<Finerac
               FederationFailedException |
               FineractBridgeAccountAdjustmentFailedException ex)
       {
+        //TODO: figure out how to communicate missing funds problem to user.
         eventSource.setProcessed(Boolean.FALSE);
         eventSource.setErrorMessage(ex.getMessage());
         logger.error("Payment attempt failed because \"{}\", retries remaining: {}",

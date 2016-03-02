@@ -20,12 +20,6 @@ public class StellarTrustlineAdjustmentFailedException extends RuntimeException 
     super(message);
   }
 
-  public static StellarTrustlineAdjustmentFailedException needTopLevelStellarAccount
-      (final String address) {
-    return new StellarTrustlineAdjustmentFailedException(
-        "Need top level Stellar account to create trustline: " + address);
-  }
-
   public static StellarTrustlineAdjustmentFailedException trustLineTransactionFailed() {
     return new StellarTrustlineAdjustmentFailedException("Credit line creation failed.");
   }

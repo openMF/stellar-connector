@@ -322,6 +322,5 @@ public class BridgeController {
       final StellarTrustlineAdjustmentFailedException ex)
   {
     return ex.getMessage();
-    //TODO: figure out how to communicate missing funds problem to user.
   }
 }

@@ -128,15 +128,13 @@ public class BridgeService implements ApplicationEventPublisherAware {
   }
 
   private StellarAccountId getTopLevelStellarAccountId(final StellarAddress stellarAddressToTrust)
-      throws FederationFailedException, StellarTrustlineAdjustmentFailedException
+      throws FederationFailedException
   {
     final StellarAccountId accountIdOfStellarAccountToTrust =
         stellarAddressResolver.getAccountIdOfStellarAccount(stellarAddressToTrust);
 
     if (accountIdOfStellarAccountToTrust.getSubAccount().isPresent()) {
-      throw StellarTrustlineAdjustmentFailedException
-          .needTopLevelStellarAccount(stellarAddressToTrust.toString());
-      //TODO: this function isn't just used by trustline adjustment.  Fix this.
+      throw FederationFailedException.needTopLevelStellarAccount(stellarAddressToTrust.toString());
     }
     return accountIdOfStellarAccountToTrust;
   }
@@ -144,6 +142,8 @@ public class BridgeService implements ApplicationEventPublisherAware {
   public boolean deleteAccountBridgeConfig(final String mifosTenantId)
   {
     return this.accountBridgeRepositoryDecorator.delete(mifosTenantId);
+
+
 
     //TODO: figure out what to do with the associated Stellar account before you delete its private key.
   }
@@ -181,8 +181,7 @@ public class BridgeService implements ApplicationEventPublisherAware {
       final String mifosTenantId,
       final String assetCode,
       final StellarAddress issuingStellarAddress)
-      throws InvalidConfigurationException,
-      FederationFailedException, StellarTrustlineAdjustmentFailedException
+      throws InvalidConfigurationException, FederationFailedException
   {
     final StellarAccountId stellarAccountId
         = accountBridgeRepositoryDecorator.getStellarAccountId(mifosTenantId);
@@ -196,7 +195,8 @@ public class BridgeService implements ApplicationEventPublisherAware {
 
   public BigDecimal getInstallationAccountBalance(
       final String assetCode,
-      final StellarAddress issuingStellarAddress) {
+      final StellarAddress issuingStellarAddress)
+      throws FederationFailedException, InvalidConfigurationException {
 
     final StellarAccountId issuingStellarAccountId =
         getTopLevelStellarAccountId(issuingStellarAddress);

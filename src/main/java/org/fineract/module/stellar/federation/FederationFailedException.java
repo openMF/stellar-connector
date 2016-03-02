@@ -43,4 +43,10 @@ public class FederationFailedException extends RuntimeException {
   public static FederationFailedException malformedAddress(final String address) {
     return new FederationFailedException("The address is not a valid stellar address: " + address);
   }
+
+  public static FederationFailedException needTopLevelStellarAccount
+      (final String address) {
+    return new FederationFailedException(
+        "Need top level Stellar account: " + address);
+  }
 }
