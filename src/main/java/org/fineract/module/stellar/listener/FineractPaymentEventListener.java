@@ -16,7 +16,7 @@
 package org.fineract.module.stellar.listener;
 
 import org.fineract.module.stellar.federation.*;
-import org.fineract.module.stellar.fineractadapter.FineractBridgeAccountAdjuster;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.fineractadapter.FineractBridgeAccountAdjustmentFailedException;
 import org.fineract.module.stellar.horizonadapter.HorizonServerUtilities;
 import org.fineract.module.stellar.horizonadapter.InvalidConfigurationException;
@@ -41,7 +41,7 @@ public class FineractPaymentEventListener implements ApplicationListener<Finerac
   private final FineractPaymentEventRepository fineractPaymentEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
   private final StellarAddressResolver stellarAddressResolver;
-  private final FineractBridgeAccountAdjuster fineractBridgeAccountAdjuster;
+  private final Adapter adapter;
   private final Logger logger;
   private final ValueSynchronizer<Long> retrySynchronizer;
 
@@ -52,13 +52,13 @@ public class FineractPaymentEventListener implements ApplicationListener<Finerac
       final FineractPaymentEventRepository fineractPaymentEventRepository,
       final HorizonServerUtilities horizonServerUtilities,
       final StellarAddressResolver stellarAddressResolver,
-      final FineractBridgeAccountAdjuster fineractBridgeAccountAdjuster,
+      final Adapter adapter,
       final @Qualifier("stellarBridgeLogger")Logger logger) {
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.fineractPaymentEventRepository = fineractPaymentEventRepository;
     this.horizonServerUtilities = horizonServerUtilities;
     this.stellarAddressResolver = stellarAddressResolver;
-    this.fineractBridgeAccountAdjuster = fineractBridgeAccountAdjuster;
+    this.adapter = adapter;
     this.logger = logger;
     this.retrySynchronizer = new ValueSynchronizer<>();
   }
@@ -105,7 +105,7 @@ public class FineractPaymentEventListener implements ApplicationListener<Finerac
         eventSource.setOutstandingRetries(0); //Set retries to 0 before telling Mifos, in case something goes wrong.
         this.fineractPaymentEventRepository.save(eventSource);
 
-        fineractBridgeAccountAdjuster.tellMifosPaymentSucceeded(bridge.getEndpoint(),
+        adapter.tellMifosPaymentSucceeded(bridge.getEndpoint(),
             bridge.getMifosStagingAccount(), event.getEventId(), paymentPayload.assetCode,
             paymentPayload.amount);
 

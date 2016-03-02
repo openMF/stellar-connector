@@ -17,7 +17,7 @@ package org.fineract.module.stellar.listener;
 
 import org.fineract.module.stellar.fineractadapter.FineractBridgeAccountAdjustmentFailedException;
 import org.fineract.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.fineract.module.stellar.fineractadapter.FineractBridgeAccountAdjuster;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.persistencedomain.StellarPaymentEventPersistency;
 import org.fineract.module.stellar.repository.AccountBridgeRepositoryDecorator;
 import org.fineract.module.stellar.repository.StellarPaymentEventRepository;
@@ -31,18 +31,18 @@ import org.springframework.stereotype.Component;
 public class StellarPaymentEventListener implements ApplicationListener<StellarPaymentEvent> {
   private final StellarPaymentEventRepository stellarPaymentEventRepository;
   private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
-  private final FineractBridgeAccountAdjuster fineractBridgeAccountAdjuster;
+  private final Adapter adapter;
   private final Logger logger;
 
   @Autowired
   public StellarPaymentEventListener(
       final StellarPaymentEventRepository stellarPaymentEventRepository,
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
-      final FineractBridgeAccountAdjuster fineractBridgeAccountAdjuster,
+      final Adapter adapter,
       @Qualifier("stellarBridgeLogger") final Logger logger) {
     this.stellarPaymentEventRepository = stellarPaymentEventRepository;
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
-    this.fineractBridgeAccountAdjuster = fineractBridgeAccountAdjuster;
+    this.adapter = adapter;
     this.logger = logger;
   }
 
@@ -60,7 +60,7 @@ public class StellarPaymentEventListener implements ApplicationListener<StellarP
 
     try
     {
-      fineractBridgeAccountAdjuster.informMifosOfIncomingStellarPayment(
+      adapter.informMifosOfIncomingStellarPayment(
           bridge.getEndpoint(),
           bridge.getMifosStagingAccount(),
           bridge.getMifosToken(),

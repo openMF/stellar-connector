@@ -16,6 +16,7 @@
 package org.fineract.module.stellar.federation;
 
 import com.google.common.net.InternetDomainName;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.fineract.module.stellar.repository.AccountBridgeRepository;
 import org.slf4j.Logger;
@@ -34,13 +35,16 @@ public class LocalFederationService {
   private String federationDomain;
 
   private final AccountBridgeRepository accountBridgeRepository;
+  private final Adapter adapter;
 
   @Autowired
   public LocalFederationService(
       @Qualifier("federationServerLogger") final Logger logger,
-      final AccountBridgeRepository accountBridgeRepository) {
+      final AccountBridgeRepository accountBridgeRepository,
+      final Adapter adapter) {
     this.logger = logger;
     this.accountBridgeRepository = accountBridgeRepository;
+    this.adapter = adapter;
   }
 
   public boolean handlesDomain(final InternetDomainName domain) {
@@ -92,9 +96,11 @@ public class LocalFederationService {
 
       if (!userAccountId.isPresent()) {
         return StellarAccountId.mainAccount(accountId);
-      } else {
-        //TODO: check that an account under this user account id actually exists.
-        return StellarAccountId.subAccount(accountId, userAccountId.get());
+      } else  if (adapter.accountExists(userAccountId.get())) {
+          return StellarAccountId.subAccount(accountId, userAccountId.get());
+      } else
+      {
+        throw FederationFailedException.addressNameNotFound(stellarAddress.toString());
       }
     }
   }

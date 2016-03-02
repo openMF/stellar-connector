@@ -23,11 +23,11 @@ import retrofit.RetrofitError;
 import java.math.BigDecimal;
 
 @Component
-public class FineractBridgeAccountAdjuster {
+public class Adapter {
   public static final int STELLAR_TRANSFER_ACCOUNT = 1; //TODO: ???
   private final RestAdapterProvider restAdapterProvider;
 
-  @Autowired FineractBridgeAccountAdjuster(final RestAdapterProvider restAdapterProvider)
+  @Autowired Adapter(final RestAdapterProvider restAdapterProvider)
   {
     this.restAdapterProvider = restAdapterProvider;
   }
@@ -85,5 +85,24 @@ public class FineractBridgeAccountAdjuster {
     {
       throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().getReason());
     }
+  }
+
+  public boolean accountExists(final String userAccount) {
+
+    //TODO: check that an account under this user account id actually exists.
+    return false;
+  }
+
+  public String createStagingAccount(String endpoint, String mifosTenantId, String mifosToken) {
+    return "placeholder"; //TODO:
+
+  }
+
+  public void removeStagingAccount(
+      final String endpoint,
+      final String mifosTenantId,
+      final String mifosToken,
+      final String mifosStagingAccount) {
+    //TODO:
   }
 }

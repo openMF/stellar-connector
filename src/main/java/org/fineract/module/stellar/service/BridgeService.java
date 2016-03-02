@@ -16,6 +16,7 @@
 package org.fineract.module.stellar.service;
 import com.google.gson.Gson;
 import org.fineract.module.stellar.federation.*;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.horizonadapter.*;
 import org.fineract.module.stellar.listener.FineractPaymentEvent;
 import org.fineract.module.stellar.persistencedomain.AccountBridgePersistency;
@@ -39,21 +40,23 @@ public class BridgeService implements ApplicationEventPublisherAware {
   private ApplicationEventPublisher eventPublisher;
   private final FineractPaymentEventRepository fineractPaymentEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
+  private final Adapter fineractAdapter;
   private final Gson gson;
   private final StellarAddressResolver stellarAddressResolver;
   private final HorizonServerPaymentObserver horizonServerPaymentObserver;
 
   @Autowired
-  public BridgeService(
-      final FineractPaymentEventRepository fineractPaymentEventRepository,
+  public BridgeService(final FineractPaymentEventRepository fineractPaymentEventRepository,
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
       final HorizonServerUtilities horizonServerUtilities,
+      final Adapter fineractAdapter,
       final Gson gson,
       final StellarAddressResolver stellarAddressResolver,
       final HorizonServerPaymentObserver horizonServerPaymentObserver) {
     this.fineractPaymentEventRepository = fineractPaymentEventRepository;
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.horizonServerUtilities = horizonServerUtilities;
+    this.fineractAdapter = fineractAdapter;
     this.gson = gson;
     this.stellarAddressResolver = stellarAddressResolver;
     this.horizonServerPaymentObserver = horizonServerPaymentObserver;
@@ -85,7 +88,8 @@ public class BridgeService implements ApplicationEventPublisherAware {
     horizonServerPaymentObserver.setupListeningForAccount(
         StellarAccountId.mainAccount(accountKeyPair.getAccountId()));
 
-    final String mifosStangingAccount = "placeholder"; //TODO
+    final String mifosStangingAccount
+        = fineractAdapter.createStagingAccount(endpoint, mifosTenantId, mifosToken);
 
     this.accountBridgeRepositoryDecorator.save(
         mifosTenantId, mifosToken, accountKeyPair, endpoint, mifosStangingAccount);
@@ -141,11 +145,19 @@ public class BridgeService implements ApplicationEventPublisherAware {
 
   public boolean deleteAccountBridgeConfig(final String mifosTenantId)
   {
+    final AccountBridgePersistency bridge = accountBridgeRepositoryDecorator.getBridge(mifosTenantId);
+    fineractAdapter.removeStagingAccount(
+        bridge.getEndpoint(),
+        bridge.getMifosTenantId(),
+        bridge.getMifosToken(),
+        bridge.getMifosStagingAccount());
+
+    //TODO: clear vault assets and prevent further transferring of vault assets.
+
+    //TODO: horizonServerUtilities.removeVaultAccount(bridge.getStellarVaultAccountId(), bridge.getStellarAccountPrivateKey());
+    //TODO: horizonServerUtilities.removeAccount(bridge.getStellarVaultAccountId(), bridge.getStellarAccountPrivateKey());
+
     return this.accountBridgeRepositoryDecorator.delete(mifosTenantId);
-
-
-
-    //TODO: figure out what to do with the associated Stellar account before you delete its private key.
   }
 
   public void sendPaymentToStellar(
