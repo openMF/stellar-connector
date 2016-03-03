@@ -34,7 +34,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-public class StellarDockerImage implements AutoCloseable {
+public class StellarDocker implements AutoCloseable {
 
   public static final String STELLAR_DOCKER_IMAGE = "stellar/stellar-core-horizon:latest";
   public static final String STELLAR_CONTAINER_NAME = "stellar-core-horizon";
@@ -46,7 +46,7 @@ public class StellarDockerImage implements AutoCloseable {
 
   private Cleanup cleanup = new Cleanup();
 
-  public StellarDockerImage() {
+  public StellarDocker() {
     dockerClient = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build();
     cleanup.addStep(dockerClient::close);
 

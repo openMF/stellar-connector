@@ -22,6 +22,7 @@ import com.github.dockerjava.api.NotModifiedException;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DockerClientBuilder;
+import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.jayway.restassured.RestAssured;
 import com.jayway.restassured.response.Response;
 import org.springframework.http.HttpStatus;
@@ -34,8 +35,8 @@ import static com.jayway.restassured.RestAssured.given;
 
 public class FineractDocker implements AutoCloseable {
 
-  public static final String MIFOSX_DOCKER_IMAGE = "mifosx-test:latest";
-  public static final String MIFOSX_CONTAINER_NAME = "mifosx-test";
+  public static final String FINERACT_DOCKER_IMAGE = "mifos/fineract-one-tenant:latest";
+  public static final String MIFOSX_CONTAINER_NAME = "fineract-one-tenant";
   public static final int PORT = 8443;
 
   final DockerClient dockerClient;
@@ -46,16 +47,13 @@ public class FineractDocker implements AutoCloseable {
     dockerClient = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build();
     cleanup.addStep(dockerClient::close);
 
-    /*List<SearchItem> x = dockerClient.searchImagesCmd(MIFOSX_DOCKER_IMAGE).exec();
-    if (x.isEmpty()) {
-      dockerClient.pullImageCmd(MIFOSX_DOCKER_IMAGE).exec(new PullImageResultCallback())
-          .awaitSuccess();
-    }*/
+    dockerClient.pullImageCmd(FINERACT_DOCKER_IMAGE).exec(new PullImageResultCallback())
+        .awaitSuccess();
 
 
     try {
       final CreateContainerResponse container =
-          dockerClient.createContainerCmd(MIFOSX_DOCKER_IMAGE)
+          dockerClient.createContainerCmd(FINERACT_DOCKER_IMAGE)
               .withAttachStderr(false)
               .withAttachStdin(false)
               .withAttachStdout(false)

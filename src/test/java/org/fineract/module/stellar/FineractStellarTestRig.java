@@ -22,16 +22,16 @@ public class FineractStellarTestRig implements AutoCloseable {
   private final Cleanup suiteCleanup = new Cleanup();
 
   public FineractStellarTestRig() throws Exception {
-    final StellarDockerImage stellarDockerImage = new StellarDockerImage();
-    suiteCleanup.addStep(stellarDockerImage::close);
+    final StellarDocker stellarDocker = new StellarDocker();
+    suiteCleanup.addStep(stellarDocker::close);
 
     final FineractDocker fineractDocker = new FineractDocker();
     suiteCleanup.addStep(fineractDocker::close);
 
-    stellarDockerImage.waitForStartupToComplete();
+    stellarDocker.waitForStartupToComplete();
     fineractDocker.waitForStartupToComplete();
 
-    System.setProperty("stellar.horizon-address", stellarDockerImage.address());
+    System.setProperty("stellar.horizon-address", stellarDocker.address());
     mifosAddress = fineractDocker.address();
   }
 

@@ -35,7 +35,7 @@ import static org.fineract.module.stellar.StellarBridgeTestHelpers.*;
 @WebIntegrationTest({
     "server.port=0", //randomPort = true
     "stellar.installation-account-private-key="
-        + StellarDockerImage.MASTER_ACCOUNT_PRIVATE_KEY,
+        + StellarDocker.MASTER_ACCOUNT_PRIVATE_KEY,
     "stellar.new-account-initial-balance=1020",
     "stellar.local-federation-domain=" + TEST_ADDRESS_DOMAIN
 })
