@@ -76,16 +76,25 @@ public class FineractPaymentEventListener implements ApplicationListener<Finerac
       if (processed || (outstandingRetries <= 0))
         return;
 
-      eventSource.setOutstandingRetries(outstandingRetries - 1);
-      eventSource.setLastModifiedOn(new Date());
-      this.fineractPaymentEventRepository.save(eventSource);
-
 
       final PaymentPersistency paymentPayload = event.getPayload();
 
       final AccountBridgePersistency bridge =
           accountBridgeRepositoryDecorator.getBridge(paymentPayload.sourceTenantId);
 
+      if (bridge == null)
+      {
+        eventSource.setOutstandingRetries(0);
+        eventSource.setLastModifiedOn(new Date());
+        this.fineractPaymentEventRepository.save(eventSource);
+        return;
+      }
+      else
+      {
+        eventSource.setOutstandingRetries(outstandingRetries - 1);
+        eventSource.setLastModifiedOn(new Date());
+        this.fineractPaymentEventRepository.save(eventSource);
+      }
 
 
       try

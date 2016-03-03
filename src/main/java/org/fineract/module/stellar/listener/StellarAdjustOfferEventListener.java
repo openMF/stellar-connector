@@ -58,8 +58,16 @@ public class StellarAdjustOfferEventListener implements
     final AccountBridgePersistency accountBridge =
         accountBridgeRepository.findByMifosTenantId(event.getMifosAccountId());
 
+
     retrySynchronizer.sync(new Pair<>(event.getMifosAccountId(), event.getAssetCode()), () -> {
       final StellarAdjustOfferEventPersistency eventSource = this.stellarAdjustOfferEventRepository.findOne(event.getEventId());
+
+      if (accountBridge == null)
+      {
+        eventSource.setOutstandingRetries(0);
+        this.stellarAdjustOfferEventRepository.save(eventSource);
+        return;
+      }
 
       final Integer outstandingRetries = eventSource.getOutstandingRetries();
       final Boolean processed = eventSource.getProcessed();

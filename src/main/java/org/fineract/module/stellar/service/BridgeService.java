@@ -19,11 +19,11 @@ import org.fineract.module.stellar.federation.*;
 import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.horizonadapter.*;
 import org.fineract.module.stellar.listener.FineractPaymentEvent;
-import org.fineract.module.stellar.persistencedomain.AccountBridgePersistency;
-import org.fineract.module.stellar.persistencedomain.FineractPaymentEventPersistency;
-import org.fineract.module.stellar.persistencedomain.PaymentPersistency;
+import org.fineract.module.stellar.persistencedomain.*;
 import org.fineract.module.stellar.repository.AccountBridgeRepositoryDecorator;
 import org.fineract.module.stellar.repository.FineractPaymentEventRepository;
+import org.fineract.module.stellar.repository.OrphanedStellarAccountRepository;
+import org.fineract.module.stellar.repository.StellarCursorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
@@ -32,6 +32,7 @@ import org.stellar.sdk.KeyPair;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.Optional;
 
 @Service
 public class BridgeService implements ApplicationEventPublisherAware {
@@ -44,15 +45,21 @@ public class BridgeService implements ApplicationEventPublisherAware {
   private final Gson gson;
   private final StellarAddressResolver stellarAddressResolver;
   private final HorizonServerPaymentObserver horizonServerPaymentObserver;
+  private final OrphanedStellarAccountRepository orphanedStellarAccountRepository;
+  private final StellarCursorRepository stellarCursorRepository;
 
   @Autowired
-  public BridgeService(final FineractPaymentEventRepository fineractPaymentEventRepository,
+  public BridgeService(
+      final FineractPaymentEventRepository fineractPaymentEventRepository,
       final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
       final HorizonServerUtilities horizonServerUtilities,
       final Adapter fineractAdapter,
       final Gson gson,
       final StellarAddressResolver stellarAddressResolver,
-      final HorizonServerPaymentObserver horizonServerPaymentObserver) {
+      final HorizonServerPaymentObserver horizonServerPaymentObserver,
+      final OrphanedStellarAccountRepository orphanedStellarAccountRepository,
+      final StellarCursorRepository stellarCursorRepository)
+  {
     this.fineractPaymentEventRepository = fineractPaymentEventRepository;
     this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
     this.horizonServerUtilities = horizonServerUtilities;
@@ -60,6 +67,8 @@ public class BridgeService implements ApplicationEventPublisherAware {
     this.gson = gson;
     this.stellarAddressResolver = stellarAddressResolver;
     this.horizonServerPaymentObserver = horizonServerPaymentObserver;
+    this.orphanedStellarAccountRepository = orphanedStellarAccountRepository;
+    this.stellarCursorRepository = stellarCursorRepository;
   }
 
   @Override
@@ -143,7 +152,7 @@ public class BridgeService implements ApplicationEventPublisherAware {
     return accountIdOfStellarAccountToTrust;
   }
 
-  public boolean deleteAccountBridgeConfig(final String mifosTenantId)
+  public void deleteAccountBridgeConfig(final String mifosTenantId)
   {
     final AccountBridgePersistency bridge = accountBridgeRepositoryDecorator.getBridge(mifosTenantId);
     fineractAdapter.removeStagingAccount(
@@ -151,13 +160,46 @@ public class BridgeService implements ApplicationEventPublisherAware {
         bridge.getMifosTenantId(),
         bridge.getMifosToken(),
         bridge.getMifosStagingAccount());
+//TODO: save the reason it failed for the orphaned accounts.
+    if (bridge.getStellarVaultAccountPrivateKey() != null) {
+      try {
+        horizonServerUtilities
+            .removeVaultAccount(StellarAccountId.mainAccount(bridge.getStellarAccountId()), bridge.getStellarAccountPrivateKey(),
+                StellarAccountId.mainAccount(bridge.getStellarVaultAccountId()), bridge.getStellarVaultAccountPrivateKey());
+      }
+      catch(final RuntimeException ex)
+      {
+        saveOrphanedStellarAccount(mifosTenantId, bridge.getStellarVaultAccountId(),
+            bridge.getStellarVaultAccountPrivateKey(), true);
+      }
+    }
 
-    //TODO: clear vault assets and prevent further transferring of vault assets.
+    try {
+      horizonServerUtilities.removeAccount(
+          StellarAccountId.mainAccount(bridge.getStellarAccountId()),
+          bridge.getStellarAccountPrivateKey());
+    }
+    catch (final RuntimeException ex)
+    {
+      saveOrphanedStellarAccount(mifosTenantId, bridge.getStellarAccountId(),
+          bridge.getStellarAccountPrivateKey(), false);
+    }
 
-    //TODO: horizonServerUtilities.removeVaultAccount(bridge.getStellarVaultAccountId(), bridge.getStellarAccountPrivateKey());
-    //TODO: horizonServerUtilities.removeAccount(bridge.getStellarVaultAccountId(), bridge.getStellarAccountPrivateKey());
+    this.accountBridgeRepositoryDecorator.delete(mifosTenantId);
+  }
 
-    return this.accountBridgeRepositoryDecorator.delete(mifosTenantId);
+  private void saveOrphanedStellarAccount(
+      final String mifosTenantId,
+      final String stellarAccountId,
+      final char[] stellarAccountPrivateKey,
+      final boolean vaultAccount) {
+    final Optional<StellarCursorPersistency> lastCursor
+        = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
+
+    orphanedStellarAccountRepository.save(
+        new OrphanedStellarAccountPersistency(
+            mifosTenantId, stellarAccountId, stellarAccountPrivateKey,
+            lastCursor.isPresent() ? lastCursor.get().getCursor() : null, vaultAccount));
   }
 
   public void sendPaymentToStellar(
@@ -250,52 +292,13 @@ public class BridgeService implements ApplicationEventPublisherAware {
     final StellarAccountId stellarAccountId
         = StellarAccountId.mainAccount(bridge.getStellarAccountId());
 
-    final BigDecimal currentVaultIssuedAssets =
-        horizonServerUtilities.currencyTrustSize(stellarAccountId, assetCode, stellarVaultAccountId);
-
-    final BigDecimal adjustmentRequired = amount.subtract(currentVaultIssuedAssets);
-
-    if (adjustmentRequired.compareTo(BigDecimal.ZERO) < 0)
-    {
-      final BigDecimal currentVaultIssuedAssetsHeldByTenant = horizonServerUtilities
-          .getBalanceByIssuer(stellarAccountId, assetCode, stellarVaultAccountId);
-
-      final BigDecimal adjustmentPossible
-          = currentVaultIssuedAssetsHeldByTenant.min(adjustmentRequired.abs());
-
-      final BigDecimal finalBalance = currentVaultIssuedAssets.subtract(adjustmentPossible);
-
-      horizonServerUtilities.simplePay(
-          stellarVaultAccountId,
-          adjustmentPossible,
-          assetCode,
-          stellarVaultAccountId,
-          bridge.getStellarAccountPrivateKey());
-
-      horizonServerUtilities.setTrustLineSize(
-          bridge.getStellarAccountPrivateKey(), stellarVaultAccountId, assetCode,
-          finalBalance);
-
-      return finalBalance;
-    }
-    else if (adjustmentRequired.compareTo(BigDecimal.ZERO) > 0)
-    {
-      horizonServerUtilities.setTrustLineSize(
-          bridge.getStellarAccountPrivateKey(), stellarVaultAccountId, assetCode,
-          amount);
-
-      horizonServerUtilities.simplePay(
-          stellarAccountId,
-          adjustmentRequired,
-          assetCode,
-          stellarVaultAccountId,
-          stellarVaultAccountPrivateKey);
-
-      return amount;
-    }
-    else {
-      return currentVaultIssuedAssets;
-    }
+    return horizonServerUtilities.adjustVaultIssuedAssets(
+        stellarAccountId,
+        bridge.getStellarAccountPrivateKey(),
+        stellarVaultAccountId,
+        stellarVaultAccountPrivateKey,
+        assetCode,
+        amount);
   }
 
   public boolean tenantHasVault(

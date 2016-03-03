@@ -168,7 +168,7 @@ class StellarAccountHelpers {
         .collect(Collectors.toSet());
   }
 
-  Stream<AccountResponse.Balance> getBalancesStream(final String assetCode, final Asset vaultAsset)
+  Stream<AccountResponse.Balance> getAllNonnativeBalancesStream(final String assetCode, final Asset vaultAsset)
   {
     return Arrays.asList(account.getBalances()).stream()
         .filter(balance -> balanceIsInAsset(balance, assetCode))
@@ -182,5 +182,18 @@ class StellarAccountHelpers {
   public BigDecimal getTrustInAsset(final Asset asset) {
     return getNumericAspectOfAsset(asset,
         balance -> stellarBalanceToBigDecimal(balance.getLimit()));
+  }
+
+  public Stream<AccountResponse.Balance> getVaultBalancesStream(final String stellarVaultAccountId) {
+    return Arrays.asList(account.getBalances()).stream()
+        .filter(balance -> balance.getAssetIssuer() != null)
+        .filter(balance -> balance.getAssetIssuer().equals(stellarVaultAccountId))
+        .filter(balance -> stellarBalanceToBigDecimal(balance.getLimit()).compareTo(BigDecimal.ZERO) != 0);
+  }
+
+  public Stream<AccountResponse.Balance> getAllNonnativeBalancesStream() {
+    return Arrays.asList(account.getBalances()).stream()
+        .filter(balance -> balance.getAssetIssuer() != null)
+        .filter(balance -> stellarBalanceToBigDecimal(balance.getBalance()).compareTo(BigDecimal.ZERO) != 0);
   }
 }

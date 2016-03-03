@@ -123,6 +123,20 @@ public class HorizonServerUtilities {
     return newTenantStellarAccountKeyPair;
   }
 
+  public void removeAccount(final StellarAccountId stellarAccountId,
+      final char[] stellarAccountPrivateKey)
+      throws InvalidConfigurationException, AccountMergerFailedException
+  {
+    final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
+
+    StellarAccountHelpers account = getAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
+
+    if (account.getAllNonnativeBalancesStream().count() != 0)
+      throw AccountMergerFailedException.accountIsNotEmpty(stellarAccountId.getPublicKey());
+
+    mergeAccount(installationAccountKeyPair, KeyPair.fromSecretSeed(stellarAccountPrivateKey));
+  }
+
   public KeyPair createVaultAccount()
     throws InvalidConfigurationException, StellarAccountCreationFailedException {
     logger.info("HorizonServerUtilities.createVaultAccount");
@@ -139,7 +153,111 @@ public class HorizonServerUtilities {
         installationAccountKeyPair,
         installationAccount);
 
+    setOptionsForNewVaultAccount(newTenantStellarVaultAccountKeyPair);
+
     return newTenantStellarVaultAccountKeyPair;
+  }
+
+  public void removeVaultAccount(
+      final StellarAccountId stellarAccountId,
+      final char[] stellarAccountPrivateKey,
+      final StellarAccountId stellarVaultAccountId,
+      final char[] stellarVaultAccountPrivateKey)
+      throws InvalidConfigurationException,
+      StellarPaymentFailedException,
+      StellarTrustlineAdjustmentFailedException,
+      AccountMergerFailedException
+  {
+    final KeyPair accountKeyPair = KeyPair.fromAccountId(stellarAccountId.getPublicKey());
+    StellarAccountHelpers account = getAccount(accountKeyPair);
+
+    account.getVaultBalancesStream(stellarVaultAccountId.getPublicKey()).forEach(
+        balance -> adjustVaultIssuedAssets(stellarAccountId, stellarAccountPrivateKey,
+            stellarVaultAccountId, stellarVaultAccountPrivateKey, balance.getAssetCode(),
+            BigDecimal.ZERO));
+
+    account = getAccount(accountKeyPair); //Get the new balances.
+
+    if (0 != account.getVaultBalancesStream(stellarVaultAccountId.getPublicKey()).count())
+      throw AccountMergerFailedException.vaultIssuedAssetsAreStillInCirculation();
+
+    mergeAccount(accountKeyPair, KeyPair.fromSecretSeed(stellarVaultAccountPrivateKey));
+  }
+
+  private void mergeAccount(
+      final KeyPair lastManStanding,
+      final KeyPair dyingBreed)
+      throws InvalidConfigurationException, AccountMergerFailedException
+  {
+
+    final HorizonSequencer accountSequencer = accounts.getUnchecked(dyingBreed.getAccountId());
+    final AccountMergeOperation.Builder mergeOperation =
+        new AccountMergeOperation.Builder(lastManStanding)
+            .setSourceAccount(dyingBreed);
+
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(accountSequencer.getAccount());
+    transactionBuilder.addOperation(mergeOperation.build());
+
+    submitTransaction(accountSequencer, transactionBuilder, dyingBreed, AccountMergerFailedException::stellarRefused);
+  }
+
+  public BigDecimal adjustVaultIssuedAssets(
+      final StellarAccountId stellarAccountId,
+      final char[] stellarAccountPrivateKey,
+      final StellarAccountId stellarVaultAccountId,
+      final char[] stellarVaultAccountPrivateKey,
+      final String assetCode,
+      final BigDecimal amount)
+      throws InvalidConfigurationException,
+      StellarPaymentFailedException,
+      StellarTrustlineAdjustmentFailedException
+  {
+    final BigDecimal currentVaultIssuedAssets =
+        currencyTrustSize(stellarAccountId, assetCode, stellarVaultAccountId);
+
+    final BigDecimal adjustmentRequired = amount.subtract(currentVaultIssuedAssets);
+
+    if (adjustmentRequired.compareTo(BigDecimal.ZERO) < 0)
+    {
+      final BigDecimal currentVaultIssuedAssetsHeldByTenant =
+          getBalanceByIssuer(stellarAccountId, assetCode, stellarVaultAccountId);
+
+      final BigDecimal adjustmentPossible
+          = currentVaultIssuedAssetsHeldByTenant.min(adjustmentRequired.abs());
+
+      final BigDecimal finalBalance = currentVaultIssuedAssets.subtract(adjustmentPossible);
+
+      simplePay(
+          stellarVaultAccountId,
+          adjustmentPossible,
+          assetCode,
+          stellarVaultAccountId,
+          stellarAccountPrivateKey);
+
+      setTrustLineSize(
+          stellarAccountPrivateKey, stellarVaultAccountId, assetCode,
+          finalBalance);
+
+      return finalBalance;
+    }
+    else if (adjustmentRequired.compareTo(BigDecimal.ZERO) > 0)
+    {
+      setTrustLineSize(
+          stellarAccountPrivateKey, stellarVaultAccountId, assetCode,
+          amount);
+
+      simplePay(
+          stellarAccountId,
+          adjustmentRequired,
+          assetCode,
+          stellarVaultAccountId,
+          stellarVaultAccountPrivateKey);
+
+      return amount;
+    }
+    else {
+      return currentVaultIssuedAssets;
+    }
   }
 
   /**
@@ -305,7 +423,7 @@ public class HorizonServerUtilities {
     final BigDecimal remainingTrustInVaultAsset = accountHelper.getRemainingTrustInAsset(vaultAsset);
 
     final Transaction.Builder transactionBuilder = new Transaction.Builder(account.getAccount());
-    accountHelper.getBalancesStream(assetCode, vaultAsset)
+    accountHelper.getAllNonnativeBalancesStream(assetCode, vaultAsset)
         .filter(balance -> !balance.getAssetIssuer().equals(vaultAccountId.getPublicKey()))
         .map(balance -> offerOperation(
                 accountKeyPair,
@@ -379,6 +497,24 @@ public class HorizonServerUtilities {
     }
 
     setOptionsOperationBuilder.setInflationDestination(installationAccountKeyPair);
+
+    transactionBuilder.addOperation(setOptionsOperationBuilder.build());
+
+    submitTransaction(newAccount, transactionBuilder, newAccountKeyPair,
+        StellarAccountCreationFailedException::new);
+  }
+
+  private void setOptionsForNewVaultAccount(
+      final KeyPair newAccountKeyPair)
+      throws StellarAccountCreationFailedException, InvalidConfigurationException
+  {
+    final HorizonSequencer newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount.getAccount());
+
+    final SetOptionsOperation.Builder setOptionsOperationBuilder =
+        new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair);
+
+    setOptionsOperationBuilder.setSetFlags(0x2);
 
     transactionBuilder.addOperation(setOptionsOperationBuilder.build());
 

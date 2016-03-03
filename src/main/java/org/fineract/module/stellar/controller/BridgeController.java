@@ -70,6 +70,8 @@ public class BridgeController {
   public ResponseEntity<String> createStellarBridgeConfiguration(
       @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
   {
+
+    //TODO: check that name can make a valid stellar address.
     if (stellarBridgeConfig.getMifosTenantId() == null ||
         stellarBridgeConfig.getMifosToken() == null ||
         stellarBridgeConfig.getEndpoint() == null)
@@ -99,14 +101,8 @@ public class BridgeController {
     this.securityService.verifyApiKey(apiKey, mifosTenantId);
     this.securityService.removeApiKey(mifosTenantId);
 
-    if (bridgeService.deleteAccountBridgeConfig(mifosTenantId))
-    {
-      return new ResponseEntity<>(HttpStatus.OK);
-    }
-    else
-    {
-      return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-    }
+    bridgeService.deleteAccountBridgeConfig(mifosTenantId);
+    return new ResponseEntity<>(HttpStatus.OK);
   }
 
   @RequestMapping(

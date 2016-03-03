@@ -100,16 +100,15 @@ public class AccountBridgeRepositoryDecorator {
     this.accountBridgeRepository.save(accountBridge);
   }
 
-  public boolean delete(final String mifosTenantId) {
+  public void delete(final String mifosTenantId) {
     final AccountBridgePersistency bridge =
         this.accountBridgeRepository.findByMifosTenantId(mifosTenantId);
 
     if (bridge == null) {
-      return false;
+      return;
     }
 
     this.accountBridgeRepository.delete(bridge.getId());
-    return true;
   }
 
   public AccountBridgePersistency getBridge(final String mifosTenantId)

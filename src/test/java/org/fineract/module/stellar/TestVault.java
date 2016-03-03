@@ -1,16 +1,23 @@
 package org.fineract.module.stellar;
 
 import com.jayway.restassured.RestAssured;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.restdomain.AmountConfiguration;
 import org.fineract.module.stellar.restdomain.TrustLineConfiguration;
+import org.jmock.Mockery;
+import org.jmock.lib.concurrent.Synchroniser;
+import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.fineract.module.stellar.configuration.BridgeConfiguration;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -19,8 +26,10 @@ import java.util.UUID;
 
 import static com.jayway.restassured.RestAssured.given;
 import static org.fineract.module.stellar.AccountBalanceMatcher.balanceMatches;
+import static org.fineract.module.stellar.RestAdapterProviderMockProvider.*;
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.*;
 
+@Component
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringApplicationConfiguration(BridgeConfiguration.class)
 @WebIntegrationTest({
@@ -41,6 +50,8 @@ public class TestVault {
   @Value("${stellar.horizon-address}")
   String serverAddress;
 
+  @Autowired Adapter adapter;
+
   static FineractStellarTestRig testRig;
 
   private Cleanup testCleanup = new Cleanup();
@@ -48,7 +59,7 @@ public class TestVault {
   private String tenantId;
   private String tenantApiKey;
 
-  public static void setVaultSizeWrong(
+  static void setVaultSizeWrong(
       final String tenantName,
       final String apiKey,
       final String assetCode,
@@ -68,7 +79,7 @@ public class TestVault {
         .content(balanceMatches(finalBalance));
   }
 
-  public static void setVaultSizeNegative(
+  static void setVaultSizeNegative(
       final String tenantName,
       final String apiKey,
       final String assetCode,
@@ -87,7 +98,7 @@ public class TestVault {
         .content(balanceMatches(requestedBalance));
   }
 
-  public static void checkVaultSize(
+  static void checkVaultSize(
       final String tenantId,
       final String apiKey,
       final String assetCode,
@@ -102,7 +113,7 @@ public class TestVault {
         .content(balanceMatches(balance));
   }
 
-  public static void checkTenantHasNoVault(
+  static void checkTenantHasNoVault(
       final String tenantId,
       final String apiKey,
       final String assetCode) {
@@ -122,6 +133,12 @@ public class TestVault {
 
   @Before
   public void setupTest() {
+    final Mockery context = new Mockery();
+    context.setThreadingPolicy(new Synchroniser());
+    context.setImposteriser(ClassImposteriser.INSTANCE);
+    ReflectionTestUtils.setField(adapter, "restAdapterProvider",
+        getRestAdapterProviderMock(context, testRig.getMifosAddress()));
+
     RestAssured.port = bridgePort;
 
     tenantId = "default";
@@ -274,4 +291,6 @@ public class TestVault {
         .put("/modules/stellarbridge/trustlines/{assetCode}/{issuer}/")
         .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
   }
+
+  //TODO: add a test for "orphaned" accounts when deletion fails.
 }

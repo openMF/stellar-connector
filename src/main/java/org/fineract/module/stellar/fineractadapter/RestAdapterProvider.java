@@ -38,7 +38,7 @@ public class RestAdapterProvider {
         .build();
   }
 
-  public OkHttpClient createClient() {
+  OkHttpClient createClient() {
 
     final OkHttpClient client = new OkHttpClient();
 
