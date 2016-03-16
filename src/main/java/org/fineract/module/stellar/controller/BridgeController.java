@@ -70,11 +70,18 @@ public class BridgeController {
   public ResponseEntity<String> createStellarBridgeConfiguration(
       @RequestBody final AccountBridgeConfiguration stellarBridgeConfig)
   {
-
-    //TODO: check that name can make a valid stellar address.
     if (stellarBridgeConfig.getMifosTenantId() == null ||
         stellarBridgeConfig.getMifosToken() == null ||
         stellarBridgeConfig.getEndpoint() == null)
+    {
+      return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      StellarAddress.parse(stellarBridgeConfig.getMifosTenantId() +
+          "*some-syntactically-valid-domain.com");
+    }
+    catch (final InvalidStellarAddressException e)
     {
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }

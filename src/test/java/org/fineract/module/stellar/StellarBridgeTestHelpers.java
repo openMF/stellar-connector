@@ -71,7 +71,7 @@ public class StellarBridgeTestHelpers {
     return creationResponse.getBody().as(String.class, ObjectMapperType.GSON);
   }
 
-  private static String getTenantToken(final String tenantName, final String mifosAddress) {
+  public static String getTenantToken(final String tenantName, final String mifosAddress) {
     //TODO: Comment the real code back in once you have a multi-tenant docker image.
     /*final String encodedTenantName;
     try {
