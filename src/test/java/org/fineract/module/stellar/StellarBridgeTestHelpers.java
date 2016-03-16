@@ -17,10 +17,8 @@ package org.fineract.module.stellar;
 
 import com.google.gson.Gson;
 import com.jayway.restassured.internal.mapper.ObjectMapperType;
-import com.jayway.restassured.path.json.JsonPath;
 import com.jayway.restassured.response.Header;
 import com.jayway.restassured.response.Response;
-import org.apache.commons.lang.StringUtils;
 import org.fineract.module.stellar.restdomain.*;
 import org.junit.Assert;
 import org.springframework.http.HttpStatus;
@@ -33,8 +31,6 @@ import java.net.URLEncoder;
 import java.util.Optional;
 
 import static com.jayway.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.fineract.module.stellar.AccountBalanceMatcher.balanceMatches;
 
 public class StellarBridgeTestHelpers {
@@ -59,7 +55,7 @@ public class StellarBridgeTestHelpers {
     return apiKey;
   }
 
-  private static String createBridge(final String tenantName, final String mifosAddress)
+  public static String createBridge(final String tenantName, final String mifosAddress)
   {
     final AccountBridgeConfiguration newAccount =
         new AccountBridgeConfiguration(tenantName, getTenantToken(tenantName, mifosAddress), mifosAddress);
@@ -76,7 +72,8 @@ public class StellarBridgeTestHelpers {
   }
 
   private static String getTenantToken(final String tenantName, final String mifosAddress) {
-    final String encodedTenantName;
+    //TODO: Comment the real code back in once you have a multi-tenant docker image.
+    /*final String encodedTenantName;
     try {
       encodedTenantName = URLEncoder.encode(tenantName, "UTF-8");
     } catch (UnsupportedEncodingException ignore) {
@@ -90,6 +87,9 @@ public class StellarBridgeTestHelpers {
     final String ret = JsonPath.with(json).get("base64EncodedAuthenticationKey");
     assertThat("Failed to acquire a tenant token", StringUtils.isBlank(ret), is(false));
     return ret;
+    */
+
+    return mifosAddress + "+" + tenantName;
   }
 
   public static void deleteBridge(final String tenantName, final String apiKey)
@@ -133,7 +133,7 @@ public class StellarBridgeTestHelpers {
             fromTenant, fromTenantApiKey, toStellarAddress, assetCode));
   }
 
-  private static void createTrustLine(
+  public static void createTrustLine(
       final String fromTenant, final String fromTenantApiKey,
       final String toStellarAddress,
       final String assetCode,
@@ -187,6 +187,17 @@ public class StellarBridgeTestHelpers {
       final String assetCode,
       final BigDecimal transferAmount)
   {
+    makePaymentExpectStatus(fromTenant, fromTenantApiKey, toTenant, assetCode, transferAmount,
+        HttpStatus.ACCEPTED);
+  }
+
+  public static void makePaymentExpectStatus(
+      final String fromTenant,
+      final String fromTenantApiKey,
+      final String toTenant,
+      final String assetCode,
+      final BigDecimal transferAmount,
+      final HttpStatus expectStatus) {
     final String payment = getPaymentPayload(
         assetCode,
         transferAmount,
@@ -200,7 +211,7 @@ public class StellarBridgeTestHelpers {
         .header(ACTION_HEADER_LABEL, ACTION_HEADER_VALUE)
         .body(payment)
         .post("/modules/stellarbridge/payments/")
-        .then().assertThat().statusCode(HttpStatus.ACCEPTED.value());
+        .then().assertThat().statusCode(expectStatus.value());
   }
 
   public static void checkBalance(

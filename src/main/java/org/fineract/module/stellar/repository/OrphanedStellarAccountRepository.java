@@ -19,7 +19,10 @@ import org.fineract.module.stellar.persistencedomain.OrphanedStellarAccountPersi
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface OrphanedStellarAccountRepository
     extends CrudRepository<OrphanedStellarAccountPersistency, Long> {
+  List<OrphanedStellarAccountPersistency> findByMifosTenantId(String mifosTenantId);
 }

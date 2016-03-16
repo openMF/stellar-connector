@@ -2,6 +2,8 @@ package org.fineract.module.stellar;
 
 import com.jayway.restassured.RestAssured;
 import org.fineract.module.stellar.fineractadapter.Adapter;
+import org.fineract.module.stellar.persistencedomain.OrphanedStellarAccountPersistency;
+import org.fineract.module.stellar.repository.OrphanedStellarAccountRepository;
 import org.fineract.module.stellar.restdomain.AmountConfiguration;
 import org.fineract.module.stellar.restdomain.TrustLineConfiguration;
 import org.jmock.Mockery;
@@ -22,6 +24,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
+import java.util.List;
 import java.util.UUID;
 
 import static com.jayway.restassured.RestAssured.given;
@@ -51,6 +54,8 @@ public class TestVault {
   String serverAddress;
 
   @Autowired Adapter adapter;
+
+  @Autowired OrphanedStellarAccountRepository orphanedStellarAccountRepository;
 
   static FineractStellarTestRig testRig;
 
@@ -225,7 +230,7 @@ public class TestVault {
   }
 
 
-  //@Test
+  @Test
   public void setVaultSizeBelowPossible() throws Exception {
     setVaultSize(tenantId, tenantApiKey, ASSET_CODE, BigDecimal.TEN);
 
@@ -292,5 +297,38 @@ public class TestVault {
         .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
   }
 
-  //TODO: add a test for "orphaned" accounts when deletion fails.
+  @Test
+  public void deleteAccountFallsBackOnOrphaningBecauseOfMoneyIssuances() throws Exception {
+    final String secondTenantId = UUID.randomUUID().toString();
+    final String secondTenantApiKey = createBridge(secondTenantId, testRig.getMifosAddress());
+
+    setVaultSize(secondTenantId, secondTenantApiKey, ASSET_CODE, BigDecimal.TEN);
+
+    createTrustLine(
+        tenantId, tenantApiKey,
+        tenantVaultStellarAddress(secondTenantId),
+        ASSET_CODE, BigDecimal.TEN);
+
+    final AccountListener accountListener = new AccountListener(serverAddress, secondTenantId);
+    final BigDecimal transferAmount = BigDecimal.valueOf(5);
+    makePayment(secondTenantId, secondTenantApiKey, tenantId, ASSET_CODE, transferAmount);
+
+    accountListener.waitForCredits(MAX_PAY_WAIT,
+        AccountListener.credit(tenantId, transferAmount, ASSET_CODE, secondTenantId));
+
+    checkBalance(tenantId, tenantApiKey, ASSET_CODE,
+        tenantVaultStellarAddress(secondTenantId), transferAmount);
+
+    deleteBridge(secondTenantId, secondTenantApiKey);
+
+    final List<OrphanedStellarAccountPersistency> orphans
+        = orphanedStellarAccountRepository.findByMifosTenantId(secondTenantId);
+
+    Assert.assertTrue(orphans.size() == 2);
+
+
+    makePaymentExpectStatus(secondTenantId, secondTenantApiKey,
+        tenantId, ASSET_CODE, transferAmount,
+        HttpStatus.UNAUTHORIZED);
+  }
 }
