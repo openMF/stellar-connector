@@ -345,16 +345,15 @@ public class TestPaymentInSimpleNetwork {
     }
   }
 
-  //TODO: test that mifos balance was adjusted.
-  //TODO: test transferring to a user account.
-  //TODO: add a test for transferring XLM.
-  //TODO: add a test with enough paths to provoke paging in find path pay.
   //TODO: add a test for installation balance.
   //TODO: add a test for simple balance.
-  //TODO: add a test with a mock for external federation containing external domain addresses.
+  //TODO: add a test for transferring XLM.
   //TODO: add a test which pays to an invalid stellar address.
+  //TODO: add a test with a mock for external federation containing external domain addresses.
+
+  //TODO: test transferring to a user account.
+  //TODO: add a test with enough paths to provoke paging in find path pay.
   //TODO: still needed a test which stops and starts the bridge component, but makes transactions
   //TODO: against Stellar while the bridge component is down.
-  //TODO: test for invalid parameters to create bridge.
   //TODO: need to add check of Mifos balance to all these test cases.
 }

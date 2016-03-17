@@ -88,6 +88,58 @@ public class TestCreateBridge {
   }
 
   @Test
+  public void createBridgeWithNullMifosTenantId()
+  {
+    final String mifosAddress = testRig.getMifosAddress();
+
+    final AccountBridgeConfiguration newAccount =
+        new AccountBridgeConfiguration(
+            null, "x", mifosAddress);
+    final Response creationResponse =
+        given()
+            .header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
+            .body(newAccount)
+            .post("/modules/stellarbridge");
+
+    creationResponse
+        .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
+  }
+
+  @Test
+  public void createBridgeWithNullMifosToken()
+  {
+    final String mifosAddress = testRig.getMifosAddress();
+
+    final AccountBridgeConfiguration newAccount =
+        new AccountBridgeConfiguration(
+            "x", null, mifosAddress);
+    final Response creationResponse =
+        given()
+            .header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
+            .body(newAccount)
+            .post("/modules/stellarbridge");
+
+    creationResponse
+        .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
+  }
+
+  @Test
+  public void createBridgeWithNullMifosAddress()
+  {
+    final AccountBridgeConfiguration newAccount =
+        new AccountBridgeConfiguration(
+            "x", "x", null);
+    final Response creationResponse =
+        given()
+            .header(StellarBridgeTestHelpers.CONTENT_TYPE_HEADER)
+            .body(newAccount)
+            .post("/modules/stellarbridge");
+
+    creationResponse
+        .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
+  }
+
+  @Test
   public void deleteBridgeDoesntOrphanAccounts()
   {
     final int previousOrphanCount = orphanCount();
