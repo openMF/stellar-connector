@@ -356,4 +356,5 @@ public class TestPaymentInSimpleNetwork {
   //TODO: still needed a test which stops and starts the bridge component, but makes transactions
   //TODO: against Stellar while the bridge component is down.
   //TODO: test for invalid parameters to create bridge.
+  //TODO: need to add check of Mifos balance to all these test cases.
 }

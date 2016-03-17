@@ -47,7 +47,6 @@ public class JournalEntryPaymentMapper {
 
     final PaymentPersistency ret = new PaymentPersistency();
 
-    //TODO: it's unclear if any of this is correct. Ask Adi.
     ret.assetCode = journalEntryData.currency.code;
     ret.amount =
         journalEntryData.amount.multiply(
