@@ -75,6 +75,7 @@ CREATE TABLE orphaned_stellar_account (
   mifos_tenant_id             VARCHAR(40)                                        NOT NULL,
   stellar_account_id          VARCHAR(60)                                        NOT NULL,
   stellar_account_private_key VARCHAR(60)                                        NOT NULL,
+  reason_removal_failed       VARCHAR(2056)                                      NOT NULL,
   last_cursor                 VARCHAR(50)                                        NOT NULL,
   vault_account               BOOLEAN                                            NOT NULL
 );

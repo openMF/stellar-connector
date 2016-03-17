@@ -160,7 +160,7 @@ public class BridgeService implements ApplicationEventPublisherAware {
         bridge.getMifosTenantId(),
         bridge.getMifosToken(),
         bridge.getMifosStagingAccount());
-//TODO: save the reason it failed for the orphaned accounts.
+
     if (bridge.getStellarVaultAccountPrivateKey() != null) {
       try {
         horizonServerUtilities
@@ -170,7 +170,7 @@ public class BridgeService implements ApplicationEventPublisherAware {
       catch(final RuntimeException ex)
       {
         saveOrphanedStellarAccount(mifosTenantId, bridge.getStellarVaultAccountId(),
-            bridge.getStellarVaultAccountPrivateKey(), true);
+            bridge.getStellarVaultAccountPrivateKey(), ex.getMessage(), true);
       }
     }
 
@@ -182,7 +182,7 @@ public class BridgeService implements ApplicationEventPublisherAware {
     catch (final RuntimeException ex)
     {
       saveOrphanedStellarAccount(mifosTenantId, bridge.getStellarAccountId(),
-          bridge.getStellarAccountPrivateKey(), false);
+          bridge.getStellarAccountPrivateKey(), ex.getMessage(), false);
     }
 
     this.accountBridgeRepositoryDecorator.delete(mifosTenantId);
@@ -192,13 +192,14 @@ public class BridgeService implements ApplicationEventPublisherAware {
       final String mifosTenantId,
       final String stellarAccountId,
       final char[] stellarAccountPrivateKey,
+      final String reasonRemovalFailed,
       final boolean vaultAccount) {
     final Optional<StellarCursorPersistency> lastCursor
         = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
 
     orphanedStellarAccountRepository.save(
         new OrphanedStellarAccountPersistency(
-            mifosTenantId, stellarAccountId, stellarAccountPrivateKey,
+            mifosTenantId, stellarAccountId, stellarAccountPrivateKey, reasonRemovalFailed,
             lastCursor.isPresent() ? lastCursor.get().getCursor() : null, vaultAccount));
   }
 

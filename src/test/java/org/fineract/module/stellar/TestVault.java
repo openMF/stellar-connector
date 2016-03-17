@@ -12,6 +12,8 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.fineract.module.stellar.configuration.BridgeConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
@@ -59,6 +61,8 @@ public class TestVault {
 
   static FineractStellarTestRig testRig;
 
+
+  private Logger logger = LoggerFactory.getLogger(TestPaymentInSimpleNetwork.class.getName());
   private Cleanup testCleanup = new Cleanup();
 
   private String tenantId;
@@ -325,6 +329,8 @@ public class TestVault {
         = orphanedStellarAccountRepository.findByMifosTenantId(secondTenantId);
 
     Assert.assertTrue(orphans.size() == 2);
+
+    orphans.stream().forEach(orphan -> logger.info("orphan: " + orphan.toString()));
 
 
     makePaymentExpectStatus(secondTenantId, secondTenantApiKey,
