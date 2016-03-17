@@ -16,24 +16,25 @@
 package org.fineract.module.stellar;
 
 import com.jayway.restassured.RestAssured;
-import com.jayway.restassured.internal.mapper.ObjectMapperType;
 import com.jayway.restassured.response.Response;
 import org.fineract.module.stellar.configuration.BridgeConfiguration;
+import org.fineract.module.stellar.repository.OrphanedStellarAccountRepository;
 import org.fineract.module.stellar.restdomain.AccountBridgeConfiguration;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import static com.jayway.restassured.RestAssured.given;
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.TEST_ADDRESS_DOMAIN;
+import static org.fineract.module.stellar.StellarBridgeTestHelpers.createBridge;
 
+@Component
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringApplicationConfiguration(BridgeConfiguration.class)
 @WebIntegrationTest({
@@ -45,6 +46,8 @@ import static org.fineract.module.stellar.StellarBridgeTestHelpers.TEST_ADDRESS_
 })
 public class TestCreateBridge {
   static FineractStellarTestRig testRig;
+
+  @Autowired OrphanedStellarAccountRepository orphanedStellarAccountRepository;
 
   @BeforeClass
   public static void setupSystem() throws Exception {
@@ -82,5 +85,24 @@ public class TestCreateBridge {
 
     creationResponse
         .then().assertThat().statusCode(HttpStatus.BAD_REQUEST.value());
+  }
+
+  @Test
+  public void deleteBridgeDoesntOrphanAccounts()
+  {
+    final int previousOrphanCount = orphanCount();
+
+    final String apiKey = createBridge("default", testRig.getMifosAddress());
+
+    StellarBridgeTestHelpers.deleteBridge("default", apiKey);
+
+
+    final int newOrphanCount = orphanCount() - previousOrphanCount;
+
+    Assert.assertEquals("new orphans should be zero.", 0, newOrphanCount);
+  }
+
+  private int orphanCount() {
+    return orphanedStellarAccountRepository.findByMifosTenantId("default").size();
   }
 }
