@@ -54,7 +54,7 @@ public class UnprocessedEventObserver implements ApplicationEventPublisherAware 
     this.logger = logger;
   }
 
-  @Scheduled(fixedRate=3600000) //Once an hour.
+  @Scheduled(fixedRate=300000) //Once every five minutes.
   void resendUnprocessedMifosPayments() {
     logger.info("Checking for and resending unprocessed payment events.");
     final Stream<FineractPaymentEventPersistency> events
@@ -69,7 +69,7 @@ public class UnprocessedEventObserver implements ApplicationEventPublisherAware 
         });
   }
 
-  @Scheduled(fixedRate=10000) //Once every ten seconds.
+  @Scheduled(fixedRate=300000) //Once every five minutes.
   void resendUnprocessedStellarAdjustments() {
     logger.info("Checking for and resending unprocessed adjustments.");
     final Stream<StellarAdjustOfferEventPersistency> events
