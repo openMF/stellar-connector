@@ -164,7 +164,7 @@ public class AccountListener {
 
     try (final Cleanup cleanup = new Cleanup()) {
       while (!incompleteCredits.isEmpty()) {
-        final Credit credit = credits.poll(maxWait / incompleteCredits.size(), TimeUnit.MILLISECONDS);
+        final Credit credit = credits.poll(maxWait, TimeUnit.MILLISECONDS);
         if (credit != null) {
           final boolean matched = incompleteCredits.remove(credit);
           if (!matched)
