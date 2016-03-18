@@ -15,11 +15,15 @@
  */
 package org.fineract.module.stellar;
 
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.fineract.module.stellar.fineractadapter.FineractClientService;
 import org.fineract.module.stellar.fineractadapter.JournalEntryCommand;
 import org.fineract.module.stellar.fineractadapter.RestAdapterProvider;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
+import org.jmock.lib.concurrent.Synchroniser;
+import org.jmock.lib.legacy.ClassImposteriser;
+import org.springframework.test.util.ReflectionTestUtils;
 import retrofit.RestAdapter;
 
 public class RestAdapterProviderMockProvider {
@@ -45,5 +49,13 @@ public class RestAdapterProviderMockProvider {
     }});
 
     return restAdapterProviderMock;
+  }
+
+  static public void mockFineract(final Adapter adapter, final String mifosAddress) {
+    final Mockery context = new Mockery();
+    context.setThreadingPolicy(new Synchroniser());
+    context.setImposteriser(ClassImposteriser.INSTANCE);
+    ReflectionTestUtils.setField(adapter, "restAdapterProvider",
+        getRestAdapterProviderMock(context, mifosAddress));
   }
 }

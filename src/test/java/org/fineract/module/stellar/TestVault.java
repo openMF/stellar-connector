@@ -6,9 +6,6 @@ import org.fineract.module.stellar.persistencedomain.OrphanedStellarAccountPersi
 import org.fineract.module.stellar.repository.OrphanedStellarAccountRepository;
 import org.fineract.module.stellar.restdomain.AmountConfiguration;
 import org.fineract.module.stellar.restdomain.TrustLineConfiguration;
-import org.jmock.Mockery;
-import org.jmock.lib.concurrent.Synchroniser;
-import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.fineract.module.stellar.configuration.BridgeConfiguration;
@@ -21,7 +18,6 @@ import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -31,7 +27,6 @@ import java.util.UUID;
 
 import static com.jayway.restassured.RestAssured.given;
 import static org.fineract.module.stellar.AccountBalanceMatcher.balanceMatches;
-import static org.fineract.module.stellar.RestAdapterProviderMockProvider.*;
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.*;
 
 @Component
@@ -142,11 +137,7 @@ public class TestVault {
 
   @Before
   public void setupTest() {
-    final Mockery context = new Mockery();
-    context.setThreadingPolicy(new Synchroniser());
-    context.setImposteriser(ClassImposteriser.INSTANCE);
-    ReflectionTestUtils.setField(adapter, "restAdapterProvider",
-        getRestAdapterProviderMock(context, testRig.getMifosAddress()));
+    RestAdapterProviderMockProvider.mockFineract(adapter, testRig.getMifosAddress());
 
     RestAssured.port = bridgePort;
 

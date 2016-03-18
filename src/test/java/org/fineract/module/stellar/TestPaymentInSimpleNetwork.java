@@ -17,13 +17,16 @@ package org.fineract.module.stellar;
 
 import com.jayway.restassured.RestAssured;
 import org.fineract.module.stellar.configuration.BridgeConfiguration;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
+import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.math.BigDecimal;
@@ -34,6 +37,7 @@ import java.util.UUID;
 
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.*;
 
+@Component
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringApplicationConfiguration(BridgeConfiguration.class)
 @WebIntegrationTest({
@@ -50,6 +54,7 @@ public class TestPaymentInSimpleNetwork {
   public static final BigDecimal VAULT_BALANCE = BigDecimal.valueOf(10000);
   public static final int PAY_WAIT = 25000;
 
+  static FineractStellarTestRig testRig;
 
   @Value("${local.server.port}")
   int bridgePort;
@@ -57,9 +62,7 @@ public class TestPaymentInSimpleNetwork {
   @Value("${stellar.horizon-address}")
   String serverAddress;
 
-  static FineractStellarTestRig testRig;
-
-
+  @Autowired Adapter adapter;
 
   private Logger logger = LoggerFactory.getLogger(TestPaymentInSimpleNetwork.class.getName());
   private Cleanup testCleanup = new Cleanup();
@@ -75,6 +78,8 @@ public class TestPaymentInSimpleNetwork {
 
   @Before
   public void setupTest() {
+    RestAdapterProviderMockProvider.mockFineract(adapter, testRig.getMifosAddress());
+
     RestAssured.port = bridgePort;
 
     firstTenantId = UUID.randomUUID().toString();
@@ -209,13 +214,16 @@ public class TestPaymentInSimpleNetwork {
         firstTenantId,
         ASSET_CODE, doubleTransferAmount);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT*3,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
-        AccountListener.credit(firstTenantId, doubleTransferAmount, ASSET_CODE, secondTenantId),
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
+    {
+      final List<AccountListener.Credit> missingCredits = accountListener
+          .waitForCredits(PAY_WAIT * 3,
+              AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
+              AccountListener.credit(firstTenantId, doubleTransferAmount, ASSET_CODE, secondTenantId),
+              AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
 
-    if (!missingCredits.isEmpty())
-      logger.info("Missing credits: " + missingCredits);
+      if (!missingCredits.isEmpty())
+        logger.info("Missing credits: " + missingCredits);
+    }
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -229,11 +237,13 @@ public class TestPaymentInSimpleNetwork {
         secondTenantId,
         ASSET_CODE, transferAmount);
 
-    final List<AccountListener.Credit> missingCredits2 = accountListener.waitForCredits(PAY_WAIT,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
+    {
+      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(PAY_WAIT,
+          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
 
-    if (!missingCredits2.isEmpty())
-      logger.info("Missing credits: " + missingCredits);
+      if (!missingCredits.isEmpty())
+        logger.info("Missing credit from back transfer: " + missingCredits);
+    }
   }
 
 
@@ -354,6 +364,5 @@ public class TestPaymentInSimpleNetwork {
   //TODO: test transferring to a user account.
   //TODO: add a test with enough paths to provoke paging in find path pay.
   //TODO: still needed a test which stops and starts the bridge component, but makes transactions
-  //TODO: against Stellar while the bridge component is down.
   //TODO: need to add check of Mifos balance to all these test cases.
 }
