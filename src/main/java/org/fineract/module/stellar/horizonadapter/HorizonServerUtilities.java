@@ -27,16 +27,16 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.stellar.sdk.*;
-import org.stellar.sdk.responses.AccountResponse;
-import org.stellar.sdk.responses.Page;
-import org.stellar.sdk.responses.PathResponse;
+import org.stellar.sdk.responses.*;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Component
 public class HorizonServerUtilities {
@@ -59,10 +59,12 @@ public class HorizonServerUtilities {
   @Value("${stellar.local-federation-domain}")
   private String localFederationDomain;
 
-  private final LoadingCache<String, HorizonSequencer> accounts;
+  private final LoadingCache<String, Account> accounts;
+
+  private final LoadingCache<Pair<String, StellarAccountId>, Map<VaultOffer, Long>> offers;
 
   @Autowired
-  HorizonServerUtilities(@Qualifier("stellarBridgeLogger")final Logger logger)
+  HorizonServerUtilities(@Qualifier("stellarBridgeLogger") final Logger logger)
   {
     this.logger = logger;
 
@@ -75,15 +77,26 @@ public class HorizonServerUtilities {
     }
     this.initialBalance = initialBalance;
     accounts = CacheBuilder.newBuilder().build(
-        new CacheLoader<String, HorizonSequencer>() {
-          public HorizonSequencer load(final String accountId)
+        new CacheLoader<String, Account>() {
+          public Account load(final String accountId)
               throws InvalidConfigurationException {
             final KeyPair accountKeyPair = KeyPair.fromAccountId(accountId);
-            final StellarAccountHelpers account = getAccount(accountKeyPair);
-            final Long sequenceNumber = account.get().getSequenceNumber();
-            return new HorizonSequencer(accountKeyPair, sequenceNumber);
+            final StellarAccountHelpers accountHelper = getAccount(accountKeyPair);
+            final Long sequenceNumber = accountHelper.get().getSequenceNumber();
+            return new Account(accountKeyPair, sequenceNumber);
           }
         });
+
+    offers = CacheBuilder.newBuilder().build(
+        new CacheLoader<Pair<String, StellarAccountId>, Map<VaultOffer, Long>>() {
+          @Override
+          public Map<VaultOffer, Long> load(final Pair<String, StellarAccountId> accountIdVaultId) {
+            return VaultOffer.getVaultOffers(
+                server,
+                accountIdVaultId.getKey(),
+                accountIdVaultId.getValue());
+      }
+    });
   }
 
   @PostConstruct
@@ -111,7 +124,7 @@ public class HorizonServerUtilities {
     logger.info("HorizonServerUtilities.createAccount");
 
     final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
-    final HorizonSequencer installationAccount
+    final Account installationAccount
         = accounts.getUnchecked(installationAccountKeyPair.getAccountId());
 
     final KeyPair newTenantStellarAccountKeyPair = KeyPair.random();
@@ -142,7 +155,7 @@ public class HorizonServerUtilities {
     logger.info("HorizonServerUtilities.createVaultAccount");
 
     final KeyPair installationAccountKeyPair = KeyPair.fromSecretSeed(installationAccountPrivateKey);
-    final HorizonSequencer installationAccount
+    final Account installationAccount
         = accounts.getUnchecked(installationAccountKeyPair.getAccountId());
 
     final KeyPair newTenantStellarVaultAccountKeyPair = KeyPair.random();
@@ -190,12 +203,12 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, AccountMergerFailedException
   {
 
-    final HorizonSequencer accountSequencer = accounts.getUnchecked(dyingBreed.getAccountId());
+    final Account accountSequencer = accounts.getUnchecked(dyingBreed.getAccountId());
     final AccountMergeOperation.Builder mergeOperation =
         new AccountMergeOperation.Builder(lastManStanding)
             .setSourceAccount(dyingBreed);
 
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(accountSequencer.getAccount());
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(accountSequencer);
     transactionBuilder.addOperation(mergeOperation.build());
 
     submitTransaction(accountSequencer, transactionBuilder, dyingBreed, AccountMergerFailedException::stellarRefused);
@@ -285,7 +298,7 @@ public class HorizonServerUtilities {
   {
     logger.info("HorizonServerUtilities.setTrustLineSize");
     final KeyPair trustingAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
-    final HorizonSequencer trustingAccount
+    final Account trustingAccount
         = accounts.getUnchecked(trustingAccountKeyPair.getAccountId());
 
     final Asset asset = StellarAccountHelpers.getAsset(assetCode, issuingStellarAccountId);
@@ -296,7 +309,7 @@ public class HorizonServerUtilities {
     final BigDecimal trustSize = balance.max(maximumAmount);
 
     final Transaction.Builder trustTransactionBuilder =
-        new Transaction.Builder(trustingAccount.getAccount());
+        new Transaction.Builder(trustingAccount);
 
     final ChangeTrustOperation trustOperation =
         new ChangeTrustOperation.Builder(asset, StellarAccountHelpers.bigDecimalToStellarBalance(trustSize)).build();
@@ -334,10 +347,10 @@ public class HorizonServerUtilities {
     final KeyPair sourceAccountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
     final KeyPair targetAccountKeyPair = KeyPair.fromAccountId(targetAccountId.getPublicKey());
 
-    final HorizonSequencer sourceAccount = accounts.getUnchecked(sourceAccountKeyPair.getAccountId());
+    final Account sourceAccount = accounts.getUnchecked(sourceAccountKeyPair.getAccountId());
 
     final Transaction.Builder transferTransactionBuilder
-        = new Transaction.Builder(sourceAccount.getAccount());
+        = new Transaction.Builder(sourceAccount);
     final PathPaymentOperation paymentOperation =
         new PathPaymentOperation.Builder(
             sendAsset,
@@ -414,7 +427,7 @@ public class HorizonServerUtilities {
 
     final KeyPair accountKeyPair = KeyPair.fromSecretSeed(stellarAccountPrivateKey);
 
-    final HorizonSequencer account = accounts.getUnchecked(accountKeyPair.getAccountId());
+    final Account account = accounts.getUnchecked(accountKeyPair.getAccountId());
 
     final Asset vaultAsset = StellarAccountHelpers.getAsset(assetCode, vaultAccountId);
 
@@ -422,7 +435,7 @@ public class HorizonServerUtilities {
     final BigDecimal balanceOfVaultAsset = accountHelper.getBalanceOfAsset(vaultAsset);
     final BigDecimal remainingTrustInVaultAsset = accountHelper.getRemainingTrustInAsset(vaultAsset);
 
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(account.getAccount());
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(account);
     accountHelper.getAllNonnativeBalancesStream(assetCode, vaultAsset)
         .filter(balance -> !balance.getAssetIssuer().equals(vaultAccountId.getPublicKey()))
         .map(balance -> offerOperation(
@@ -431,7 +444,8 @@ public class HorizonServerUtilities {
                 vaultAsset,
                 determineOfferAmount(balanceOfVaultAsset,
                     remainingTrustInVaultAsset,
-                    StellarAccountHelpers.stellarBalanceToBigDecimal(balance.getBalance()))))
+                    StellarAccountHelpers.stellarBalanceToBigDecimal(balance.getBalance())),
+                determineOfferId(accountKeyPair.getAccountId(), vaultAccountId, balance)))
         .forEach(transactionBuilder::addOperation);
 
     if (transactionBuilder.getOperationsCount() != 0)
@@ -447,26 +461,41 @@ public class HorizonServerUtilities {
     return remainingTrustInVaultAsset.min(balanceOfVaultAsset.min(balanceOfMatchingAsset));
   }
 
+  Optional<Long> determineOfferId(
+      final String accountId,
+      final StellarAccountId vaultAccountId,
+      final AccountResponse.Balance balance)
+  {
+    final Map<VaultOffer, Long>
+        vaultOffers = offers.getUnchecked(new Pair<>(accountId, vaultAccountId));
+
+    return Optional.ofNullable(
+        vaultOffers.get(new VaultOffer(balance.getAssetCode(), balance.getAssetIssuer())));
+  }
 
   private ManageOfferOperation offerOperation(
       final KeyPair sourceAccountKeyPair,
       final Asset fromAsset,
       final Asset toAsset,
-      final BigDecimal amount)
+      final BigDecimal amount,
+      final Optional<Long> offerId)
   {
     final ManageOfferOperation.Builder offerOperationBuilder
         = new ManageOfferOperation.Builder(
         fromAsset, toAsset, StellarAccountHelpers.bigDecimalToStellarBalance(amount), "1");
     offerOperationBuilder.setSourceAccount(sourceAccountKeyPair);
+
+    offerId.ifPresent(offerOperationBuilder::setOfferId);
+
     return offerOperationBuilder.build();
   }
 
   private void createAccountForKeyPair(final int initialBalance, final KeyPair newAccountKeyPair,
-      final KeyPair installationAccountKeyPair, final HorizonSequencer installationAccount)
+      final KeyPair installationAccountKeyPair, final Account installationAccount)
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final Transaction.Builder transactionBuilder
-        = new Transaction.Builder(installationAccount.getAccount());
+        = new Transaction.Builder(installationAccount);
 
     final CreateAccountOperation createAccountOperation =
         new CreateAccountOperation.Builder(newAccountKeyPair,
@@ -485,8 +514,8 @@ public class HorizonServerUtilities {
       final KeyPair installationAccountKeyPair)
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
-    final HorizonSequencer newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount.getAccount());
+    final Account newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
 
     final SetOptionsOperation.Builder setOptionsOperationBuilder =
         new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair);
@@ -508,8 +537,8 @@ public class HorizonServerUtilities {
       final KeyPair newAccountKeyPair)
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
-    final HorizonSequencer newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount.getAccount());
+    final Account newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
 
     final SetOptionsOperation.Builder setOptionsOperationBuilder =
         new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair);
@@ -591,7 +620,7 @@ public class HorizonServerUtilities {
         return Optional.empty();
       }
 
-      while (paths != null) {
+      while (paths != null && paths.getRecords() != null) {
         for (final PathResponse path : paths.getRecords())
         {
           if (StellarAccountHelpers.stellarBalanceToBigDecimal(path.getSourceAmount()).compareTo(amount) <= 0)
@@ -619,15 +648,40 @@ public class HorizonServerUtilities {
   }
 
   private <T extends Exception> void submitTransaction(
-      final HorizonSequencer transactionSubmitter,
+      final Account transactionSubmitter,
       final Transaction.Builder transactionBuilder,
       final KeyPair signingKeyPair,
-      final HorizonSequencer.TransactionFailedException<RuntimeException> failureHandler)
+      final Supplier<T> failureHandler)
       throws T
   {
     try {
-      transactionSubmitter.submitTransaction(server, transactionBuilder, signingKeyPair, logger,
-          failureHandler);
+      //final Long sequenceNumberSubmitted = account.getSequenceNumber();
+
+      //noinspection SynchronizationOnLocalVariableOrMethodParameter
+      synchronized (transactionSubmitter) {
+        final Transaction transaction = transactionBuilder.build();
+        transaction.sign(signingKeyPair);
+        final SubmitTransactionResponse transactionResponse = server.submitTransaction(transaction);
+        if (!transactionResponse.isSuccess()) {
+          if (transactionResponse.getExtras() != null) {
+            logger.info("Stellar transaction failed, request: {}", transactionResponse.getExtras().getEnvelopeXdr());
+            logger.info("Stellar transaction failed, response: {}", transactionResponse.getExtras().getResultXdr());
+          }
+          else
+          {
+            logger.info("Stellar transaction failed.  No extra information available.");
+          }
+          //TODO: resend transaction if you get a bad sequence.
+              /*Thread.sleep(6000); //Wait for ledger to close.
+              Long sequenceNumberShouldHaveBeen =
+                  server.accounts().account(account.getKeypair()).getSequenceNumber();
+              if (sequenceNumberSubmitted != sequenceNumberShouldHaveBeen) {
+                logger.info("Sequence number submitted: {}, Sequence number should have been: {}",
+                    sequenceNumberSubmitted, sequenceNumberShouldHaveBeen);
+              }*/
+          throw failureHandler.get();
+        }
+      }
     } catch (final IOException e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
     }

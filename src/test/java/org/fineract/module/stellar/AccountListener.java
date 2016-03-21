@@ -144,7 +144,7 @@ public class AccountListener {
 
     final EffectsRequestBuilder effectsRequestBuilder
         = new EffectsRequestBuilder(URI.create(serverAddress));
-    effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId));
+    effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId)).cursor("now");
 
     final Listener listener = new Listener();
 
@@ -163,6 +163,9 @@ public class AccountListener {
     final long startTime = new Date().getTime();
 
     try (final Cleanup cleanup = new Cleanup()) {
+      //Sleep before you return from this function...
+      cleanup.addStep(() -> Thread.sleep(100));
+
       while (!incompleteCredits.isEmpty()) {
         final Credit credit = credits.poll(maxWait, TimeUnit.MILLISECONDS);
         if (credit != null) {
@@ -172,12 +175,44 @@ public class AccountListener {
         }
 
         final long now = new Date().getTime();
+        final long waitedSoFar = now - startTime;
 
-        if (((now - startTime) > maxWait) && credits.isEmpty())
+        if ((waitedSoFar > maxWait) && credits.isEmpty())
           return incompleteCredits;
       }
 
       return incompleteCredits;
+    }
+  }
+
+  public BigDecimal waitForCreditsToAccumulate(final long maxWait, final Credit sumCreditExpected)
+    throws Exception {
+    BigDecimal missingBalance = sumCreditExpected.amount;
+
+    final long startTime = new Date().getTime();
+
+    try (final Cleanup cleanup = new Cleanup()) {
+      while (missingBalance.compareTo(BigDecimal.ZERO) > 0)
+      {
+        final Credit credit = credits.poll(maxWait, TimeUnit.MILLISECONDS);
+        if (credit != null) {
+          final boolean matched = sumCreditExpected.assetCode.equals(credit.assetCode) &&
+              sumCreditExpected.issuingTenantVault.equals(credit.issuingTenantVault) &&
+              sumCreditExpected.toTenantId.equals(credit.toTenantId);
+          if (!matched)
+            cleanup.addStep(() -> credits.put(credit));
+          else
+            missingBalance = missingBalance.subtract(credit.amount);
+        }
+
+        final long now = new Date().getTime();
+        final long waitedSoFar = now - startTime;
+
+        if ((waitedSoFar > maxWait) && credits.isEmpty())
+          return missingBalance;
+      }
+
+      return missingBalance;
     }
   }
 }

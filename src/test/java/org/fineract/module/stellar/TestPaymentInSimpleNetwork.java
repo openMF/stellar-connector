@@ -285,6 +285,7 @@ public class TestPaymentInSimpleNetwork {
         transferIncrement.multiply(BigDecimal.TEN));
 
 
+    logger.info("paymentSumApproachesCreditLimit transfers back");
     Collections.nCopies(10, transferIncrement).parallelStream().forEach(
         (transferAmount) -> makePayment(secondTenantId, secondTenantApiKey, firstTenantId,
             ASSET_CODE, transferAmount));
@@ -293,17 +294,30 @@ public class TestPaymentInSimpleNetwork {
       final List<AccountListener.Credit> transfers = new ArrayList<>();
       transfers.addAll(Collections.nCopies(10,
           AccountListener.credit(firstTenantId, transferIncrement, ASSET_CODE, secondTenantId)));
-      transfers.addAll(Collections.nCopies(10,
-          AccountListener.credit(secondTenantId, transferIncrement, ASSET_CODE, secondTenantId)));
-      transfers.addAll(Collections.nCopies(10,
-          AccountListener.credit(firstTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
-
 
       final List<AccountListener.Credit> leftOverTransfers =
-          accountListener.waitForCredits(PAY_WAIT *15, transfers);
+          accountListener.waitForCredits(PAY_WAIT *5, transfers);
 
       if (!leftOverTransfers.isEmpty())
         logger.info("{} transfers not completed.", leftOverTransfers.size());
+
+      BigDecimal leftOverBalance = accountListener.waitForCreditsToAccumulate(PAY_WAIT * 5,
+          AccountListener
+              .credit(secondTenantId, transferIncrement.multiply(BigDecimal.TEN), ASSET_CODE,
+                  secondTenantId));
+
+      if (leftOverBalance.compareTo(BigDecimal.ZERO) != 0)
+        logger.info("The full balance was not transfered back to secondTenant.  Missing {}", leftOverBalance);
+
+      leftOverBalance = accountListener.waitForCreditsToAccumulate(PAY_WAIT * 5,
+          AccountListener.credit(
+              firstTenantId,
+              transferIncrement.multiply(BigDecimal.TEN),
+              ASSET_CODE,
+              firstTenantId));
+
+      if (leftOverBalance.compareTo(BigDecimal.ZERO) != 0)
+        logger.info("The full balance was not transfered back to firstTenant.  Missing {}", leftOverBalance);
     }
 
     checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
