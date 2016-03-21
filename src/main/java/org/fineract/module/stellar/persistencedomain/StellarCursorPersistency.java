@@ -55,6 +55,10 @@ public class StellarCursorPersistency {
     this.processed = processed;
   }
 
+  public Boolean getProcessed() {
+    return processed;
+  }
+
   @SuppressWarnings("unused")
   public Date getCreatedOn() {
     return createdOn;

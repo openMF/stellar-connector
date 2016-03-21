@@ -19,13 +19,16 @@ import org.fineract.module.stellar.federation.StellarAccountId;
 import org.fineract.module.stellar.persistencedomain.StellarCursorPersistency;
 import org.fineract.module.stellar.repository.AccountBridgeRepository;
 import org.fineract.module.stellar.repository.StellarCursorRepository;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.requests.EffectsRequestBuilder;
 
 import javax.annotation.PostConstruct;
+import javax.validation.constraints.NotNull;
 import java.net.URI;
 import java.util.Optional;
 
@@ -38,6 +41,7 @@ public class HorizonServerPaymentObserver {
   private final AccountBridgeRepository accountBridgeRepository;
   private final StellarCursorRepository stellarCursorRepository;
   private final HorizonServerEffectsListener listener;
+  private final Logger logger;
 
   @PostConstruct
   void init()
@@ -46,43 +50,51 @@ public class HorizonServerPaymentObserver {
 
     accountBridgeRepository.findAll()
         .forEach(bridge -> setupListeningForAccount(
-                    StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
+                    StellarAccountId.mainAccount(bridge.getStellarAccountId()),
+            cursor.orElseThrow(InvalidConfigurationException::cantStartupWithNoCurrentCursor)));
   }
 
   @Autowired
   HorizonServerPaymentObserver(
       final AccountBridgeRepository accountBridgeRepository,
       final StellarCursorRepository stellarCursorRepository,
-      final HorizonServerEffectsListener listener)
+      final HorizonServerEffectsListener listener,
+      final @Qualifier("stellarBridgeLogger") Logger logger)
   {
     this.accountBridgeRepository = accountBridgeRepository;
     this.stellarCursorRepository = stellarCursorRepository;
 
     this.listener = listener;
+
+    this.logger = logger;
   }
 
   public void setupListeningForAccount(final StellarAccountId stellarAccountId)
   {
-    setupListeningForAccount(stellarAccountId, getCurrentCursor());
+    setupListeningForAccount(stellarAccountId, "now");
+
+    //TODO: We need to get current cursor and insert it into cursor persistency *here* in case...
+    // bridge is stopped before the first event comes, so that we know which Stellar events
+    // we missed while the bridge was down.
   }
 
   private Optional<String> getCurrentCursor() {
     final Optional<StellarCursorPersistency> cursorPersistency
         = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
-    if (!cursorPersistency.isPresent())
-      return Optional.empty();
-    else
-      return Optional.of(cursorPersistency.get().getCursor());
+
+    return cursorPersistency.map(StellarCursorPersistency::getCursor);
   }
 
   private void setupListeningForAccount(
-      final StellarAccountId stellarAccountId, final Optional<String> cursor)
+      @NotNull final StellarAccountId stellarAccountId, @NotNull final String cursor)
   {
+    logger.info("HorizonServerPaymentObserver.setupListeningForAccount {}, cursor {}",
+        stellarAccountId.getPublicKey(), cursor);
+
     final EffectsRequestBuilder effectsRequestBuilder
         = new EffectsRequestBuilder(URI.create(serverAddress));
     effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
-    if (cursor.isPresent())
-      effectsRequestBuilder.cursor(cursor.get());
+    effectsRequestBuilder.cursor(cursor);
 
     effectsRequestBuilder.stream(listener);
   }

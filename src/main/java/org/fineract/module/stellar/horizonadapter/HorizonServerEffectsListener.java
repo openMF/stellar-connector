@@ -78,7 +78,7 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
     final String pagingToken = operation.getPagingToken();
 
     final StellarCursorPersistency cursorPersistency = markPlace(pagingToken);
-    if (cursorPersistency == null)
+    if (cursorPersistency.getProcessed())
       return;
 
     logger.info("Operation with cursor {}", pagingToken);
@@ -89,14 +89,15 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
     stellarCursorRepository.save(cursorPersistency);
   }
 
-  synchronized
   StellarCursorPersistency markPlace(final String pagingToken)
   {
-    final StellarCursorPersistency entry = stellarCursorRepository.findByCursor(pagingToken);
-    if (entry != null)
-      return null;
+    synchronized (stellarCursorRepository) {
+      final Optional<StellarCursorPersistency> entry =
+          stellarCursorRepository.findByCursor(pagingToken);
 
-    return stellarCursorRepository.save(new StellarCursorPersistency(pagingToken, new Date()));
+      return entry.orElse(
+          stellarCursorRepository.save(new StellarCursorPersistency(pagingToken, new Date())));
+    }
   }
 
   private void handleOperation(final EffectResponse effect) {
@@ -118,6 +119,7 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
       logger.info("Credit to {} of {}, in currency {}@{}",
           toAccount.getMifosTenantId(), amount, assetCode, issuer);
 
+      //TODO: This will prevent lumens from being registered in the mifos account (likewise below in debit)...
       if (!(asset instanceof AssetTypeCreditAlphaNum))
         return;
 

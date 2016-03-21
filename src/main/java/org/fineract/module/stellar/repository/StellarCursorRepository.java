@@ -25,5 +25,5 @@ import java.util.Optional;
 @Repository
 public interface StellarCursorRepository extends CrudRepository<StellarCursorPersistency, Long> {
   Optional<StellarCursorPersistency> findTopByProcessedTrueOrderByCreatedOnDesc();
-  StellarCursorPersistency findByCursor(String cursor);
+  Optional<StellarCursorPersistency> findByCursor(String cursor);
 }
