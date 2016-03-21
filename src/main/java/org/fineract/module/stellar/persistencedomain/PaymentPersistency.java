@@ -25,4 +25,16 @@ public class PaymentPersistency {
   public String targetAccount;
   public String targetSubAccount;
   public boolean isStellarPayment;
+
+  @Override public String toString() {
+    return "PaymentPersistency{" +
+        "sourceTenantId='" + sourceTenantId + '\'' +
+        ", assetCode='" + assetCode + '\'' +
+        ", amount=" + amount +
+        ", sinkDomain='" + sinkDomain + '\'' +
+        ", targetAccount='" + targetAccount + '\'' +
+        ", targetSubAccount='" + targetSubAccount + '\'' +
+        ", isStellarPayment=" + isStellarPayment +
+        '}';
+  }
 }

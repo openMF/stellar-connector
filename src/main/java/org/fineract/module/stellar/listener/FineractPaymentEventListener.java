@@ -120,7 +120,7 @@ public class FineractPaymentEventListener implements ApplicationListener<Finerac
 
         eventSource.setProcessed(Boolean.TRUE);
         eventSource.setErrorMessage("");
-        logger.info("Horizon payment processed.");
+        logger.info("Horizon payment processed: {}", event.getPayload());
       }
       catch (
           final InvalidConfigurationException |

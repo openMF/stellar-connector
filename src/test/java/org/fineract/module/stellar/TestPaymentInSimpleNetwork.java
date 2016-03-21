@@ -108,6 +108,7 @@ public class TestPaymentInSimpleNetwork {
 
   @After
   public void tearDownTest() throws Exception {
+    logger.info("TestPaymentInSimpleNetwork.tearDownTest");
     testCleanup.cleanup();
   }
 
