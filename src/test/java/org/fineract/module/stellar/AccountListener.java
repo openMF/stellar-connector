@@ -15,7 +15,10 @@
  */
 package org.fineract.module.stellar;
 
+import com.google.common.base.Preconditions;
 import javafx.util.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.stellar.sdk.Asset;
 import org.stellar.sdk.AssetTypeCreditAlphaNum;
 import org.stellar.sdk.KeyPair;
@@ -28,6 +31,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +39,7 @@ import static org.fineract.module.stellar.StellarBridgeTestHelpers.getStellarAcc
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.getStellarVaultAccountIdForTenantId;
 
 public class AccountListener {
+
   static class Credit
   {
     private final String toTenantId;
@@ -87,6 +92,18 @@ public class AccountListener {
   class Listener implements EventListener<EffectResponse> {
 
     @Override public void onEvent(final EffectResponse effect) {
+      logger.info("OnEvent with cursor {}", effect.getPagingToken());
+
+      synchronized (operationsAlreadySeen)
+      {
+        if (operationsAlreadySeen.contains(effect.getPagingToken()))
+        {
+          return;
+        }
+
+        operationsAlreadySeen.add(effect.getPagingToken());
+      }
+
       if (effect instanceof AccountCreditedEffectResponse)
       {
         final String to = stellarIdToTenantId.get(effect.getAccount().getAccountId());
@@ -108,24 +125,36 @@ public class AccountListener {
         }
 
 
-        credits.add(new Credit(to, amount, code, issuer));
+        final Credit credit = new Credit(to, amount, code, issuer);
+        logger.info("adding credit to queue {}", credit);
+        credits.add(credit);
       }
-
     }
   }
 
-  final BlockingQueue<Credit> credits = new LinkedBlockingQueue<>();
-  final Map<String, String> stellarIdToTenantId = new HashMap<>();
-  final Map<String, String> stellarVaultIdToTenantId = new HashMap<>();
+  private Logger logger = LoggerFactory.getLogger(AccountListener.class.getName());
+  private final BlockingQueue<Credit> credits = new LinkedBlockingQueue<>();
+  private final Set<String> operationsAlreadySeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
+  private final Map<String, String> stellarIdToTenantId = new HashMap<>();
+  private final Map<String, String> stellarVaultIdToTenantId = new HashMap<>();
+  private final Map<String, String> tenantIdToStellarId = new HashMap<>();
+  private final String targetTenantId;
 
   AccountListener(final String serverAddress, final String... tenantIds)
   {
+    Preconditions.checkNotNull(tenantIds);
+    Preconditions.checkState(tenantIds.length != 0);
+
     Arrays.asList(tenantIds).stream()
         .filter(tenantId -> tenantId != null)
         .map(tenantId -> new Pair<>(getStellarAccountIdForTenantId(tenantId), tenantId))
         .filter(pair -> pair.getKey().isPresent())
         .forEachOrdered(pair ->
-            stellarIdToTenantId.put(pair.getKey().get(), pair.getValue()));
+        {
+          stellarIdToTenantId.put(pair.getKey().get(), pair.getValue());
+          tenantIdToStellarId.put(pair.getValue(), pair.getKey().get());
+        }
+        );
 
 
     Arrays.asList(tenantIds).stream()
@@ -135,9 +164,10 @@ public class AccountListener {
         .forEachOrdered(pair ->
             stellarVaultIdToTenantId.put(pair.getKey().get(), pair.getValue()));
 
-    stellarIdToTenantId.entrySet().stream().forEach(
-        mapEntry -> installPaymentListener(serverAddress, mapEntry.getKey())
-    );
+    targetTenantId = tenantIds[0];
+
+    //Listen for only the first account on the list (otherwise payment events are sent for both send and receive).
+    installPaymentListener(serverAddress, tenantIdToStellarId.get(targetTenantId));
   }
 
   private void installPaymentListener(final String serverAddress, final String stellarAccountId) {
@@ -158,35 +188,42 @@ public class AccountListener {
 
   public List<Credit> waitForCredits(final long maxWait, final List<Credit> creditsExpected)
       throws Exception {
+    logger.info("Waiting {} milliseconds for credits to tenant {}.", maxWait, targetTenantId);
+
     final List<Credit> incompleteCredits = new LinkedList<>(creditsExpected);
 
     final long startTime = new Date().getTime();
 
     try (final Cleanup cleanup = new Cleanup()) {
-      //Sleep before you return from this function...
-      cleanup.addStep(() -> Thread.sleep(100));
-
       while (!incompleteCredits.isEmpty()) {
         final Credit credit = credits.poll(maxWait, TimeUnit.MILLISECONDS);
+
+        final long now = new Date().getTime();
+        final long waitedSoFar = now - startTime;
+
         if (credit != null) {
           final boolean matched = incompleteCredits.remove(credit);
           if (!matched)
             cleanup.addStep(() -> credits.put(credit));
         }
 
-        final long now = new Date().getTime();
-        final long waitedSoFar = now - startTime;
 
-        if ((waitedSoFar > maxWait) && credits.isEmpty())
+        if ((waitedSoFar > maxWait) && credits.isEmpty()) {
+          logger.info("Wait time for tenant {} is up, and there are {} incomplete credits {}",
+              targetTenantId, incompleteCredits.size(), incompleteCredits);
           return incompleteCredits;
+        }
       }
 
+      logger.info("Wait time for tenant {} is up, and there are {} incomplete credits {}",
+          targetTenantId, incompleteCredits.size(), incompleteCredits);
       return incompleteCredits;
     }
   }
 
   public BigDecimal waitForCreditsToAccumulate(final long maxWait, final Credit sumCreditExpected)
     throws Exception {
+    logger.info("Waiting {} milliseconds for credit accumulation to tenant {}.", maxWait, targetTenantId);
     BigDecimal missingBalance = sumCreditExpected.amount;
 
     final long startTime = new Date().getTime();
@@ -208,10 +245,16 @@ public class AccountListener {
         final long now = new Date().getTime();
         final long waitedSoFar = now - startTime;
 
-        if ((waitedSoFar > maxWait) && credits.isEmpty())
+        if ((waitedSoFar > maxWait) && credits.isEmpty()) {
+
+          logger.info("Wait time for tenant {} is up, and there missing balance is {}",
+              targetTenantId, missingBalance);
           return missingBalance;
+        }
       }
 
+      logger.info("Wait time for tenant {} is up, and there missing balance is {}",
+          targetTenantId, missingBalance);
       return missingBalance;
     }
   }
