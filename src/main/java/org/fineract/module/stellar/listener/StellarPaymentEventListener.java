@@ -76,7 +76,7 @@ public class StellarPaymentEventListener implements ApplicationListener<StellarP
 
       eventSource.setProcessed(Boolean.TRUE);
       eventSource.setErrorMessage("");
-      logger.info("Horizon payment processed.");
+      logger.info("Fineract payment processed.");
     }
     catch (FineractBridgeAccountAdjustmentFailedException ex)
     {

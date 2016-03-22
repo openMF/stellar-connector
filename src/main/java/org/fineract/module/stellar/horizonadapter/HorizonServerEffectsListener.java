@@ -77,6 +77,8 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
   @Override public void onEvent(final EffectResponse operation) {
     final String pagingToken = operation.getPagingToken();
 
+    //This is important, because an event can be sent twice if we are managing both the sending and
+    //receiving account.  We need to be certain we process it only once.
     final StellarCursorPersistency cursorPersistency = markPlace(pagingToken);
     if (cursorPersistency.getProcessed())
       return;

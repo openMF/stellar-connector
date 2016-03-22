@@ -33,9 +33,4 @@ public class InvalidConfigurationException extends RuntimeException {
         "Unreachable stellar server address: " + serverAddress +
             ". Have your admin check configuration.");
   }
-
-  public static InvalidConfigurationException cantStartupWithNoCurrentCursor() {
-    return new InvalidConfigurationException("Can't start up with no current cursor. "
-        + "Otherwise we might miss stellar transactions.");
-  }
 }

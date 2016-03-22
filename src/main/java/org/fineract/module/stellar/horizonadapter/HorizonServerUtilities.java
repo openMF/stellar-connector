@@ -435,6 +435,11 @@ public class HorizonServerUtilities {
     final BigDecimal balanceOfVaultAsset = accountHelper.getBalanceOfAsset(vaultAsset);
     final BigDecimal remainingTrustInVaultAsset = accountHelper.getRemainingTrustInAsset(vaultAsset);
 
+    final Pair<String, StellarAccountId> offerKey =
+        new Pair<>(accountKeyPair.getAccountId(), vaultAccountId);
+    offers.refresh(offerKey);
+    final Map<VaultOffer, Long> vaultOffers = offers.getUnchecked(offerKey);
+
     final Transaction.Builder transactionBuilder = new Transaction.Builder(account);
     accountHelper.getAllNonnativeBalancesStream(assetCode, vaultAsset)
         .filter(balance -> !balance.getAssetIssuer().equals(vaultAccountId.getPublicKey()))
@@ -445,12 +450,13 @@ public class HorizonServerUtilities {
                 determineOfferAmount(balanceOfVaultAsset,
                     remainingTrustInVaultAsset,
                     StellarAccountHelpers.stellarBalanceToBigDecimal(balance.getBalance())),
-                determineOfferId(accountKeyPair.getAccountId(), vaultAccountId, balance)))
+                determineOfferId(vaultOffers, balance)))
         .forEach(transactionBuilder::addOperation);
 
-    if (transactionBuilder.getOperationsCount() != 0)
+    if (transactionBuilder.getOperationsCount() != 0) {
       submitTransaction(account, transactionBuilder, accountKeyPair,
           StellarOfferAdjustmentFailedException::new);
+    }
   }
 
   static BigDecimal determineOfferAmount(
@@ -462,13 +468,9 @@ public class HorizonServerUtilities {
   }
 
   Optional<Long> determineOfferId(
-      final String accountId,
-      final StellarAccountId vaultAccountId,
+      final Map<VaultOffer, Long> vaultOffers,
       final AccountResponse.Balance balance)
   {
-    final Map<VaultOffer, Long>
-        vaultOffers = offers.getUnchecked(new Pair<>(accountId, vaultAccountId));
-
     return Optional.ofNullable(
         vaultOffers.get(new VaultOffer(balance.getAssetCode(), balance.getAssetIssuer())));
   }

@@ -50,8 +50,7 @@ public class HorizonServerPaymentObserver {
 
     accountBridgeRepository.findAll()
         .forEach(bridge -> setupListeningForAccount(
-                    StellarAccountId.mainAccount(bridge.getStellarAccountId()),
-            cursor.orElseThrow(InvalidConfigurationException::cantStartupWithNoCurrentCursor)));
+                    StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
   }
 
   @Autowired
@@ -71,11 +70,7 @@ public class HorizonServerPaymentObserver {
 
   public void setupListeningForAccount(final StellarAccountId stellarAccountId)
   {
-    setupListeningForAccount(stellarAccountId, "now");
-
-    //TODO: We need to get current cursor and insert it into cursor persistency *here* in case...
-    // bridge is stopped before the first event comes, so that we know which Stellar events
-    // we missed while the bridge was down.
+    setupListeningForAccount(stellarAccountId, Optional.empty());
   }
 
   private Optional<String> getCurrentCursor() {
@@ -86,7 +81,7 @@ public class HorizonServerPaymentObserver {
   }
 
   private void setupListeningForAccount(
-      @NotNull final StellarAccountId stellarAccountId, @NotNull final String cursor)
+      @NotNull final StellarAccountId stellarAccountId, @NotNull final Optional<String> cursor)
   {
     logger.info("HorizonServerPaymentObserver.setupListeningForAccount {}, cursor {}",
         stellarAccountId.getPublicKey(), cursor);
@@ -94,7 +89,7 @@ public class HorizonServerPaymentObserver {
     final EffectsRequestBuilder effectsRequestBuilder
         = new EffectsRequestBuilder(URI.create(serverAddress));
     effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
-    effectsRequestBuilder.cursor(cursor);
+    cursor.ifPresent(effectsRequestBuilder::cursor);
 
     effectsRequestBuilder.stream(listener);
   }
