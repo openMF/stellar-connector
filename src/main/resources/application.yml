@@ -1,0 +1,29 @@
+# server configuration
+server:
+  port: 9192
+
+# endpoint configuration
+endpoints:
+  shutdown:
+    enabled: true
+
+# database configuration
+spring:
+  jpa:
+    show-sql: false
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+
+  datasource:
+    url: jdbc:hsqldb:file:stellarmoduledb
+    username: sa
+    password:
+    driver-class-name: org.hsqldb.jdbcDriver
+
+# stellar horizon server configuration
+stellar:
+  horizon-address: https://horizon-testnet.stellar.org
+  installation-account-private-key: SDHOAMBNLGCE2MV5ZKIVZAQD3VCLGP53P3OBSBI6UN5L5XZI5TKHFQL4
+  local-federation-domain: mifos-installation.org
+  new-account-initial-balance: 10000
