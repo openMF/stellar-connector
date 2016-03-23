@@ -35,6 +35,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.fineract.module.stellar.AccountListener.*;
+import static org.fineract.module.stellar.AccountListener.vaultMatcher;
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.*;
 
 @Component
@@ -132,7 +134,7 @@ public class TestPaymentInSimpleNetwork {
 
 
     accountListener.waitForCredits(PAY_WAIT,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
+        creditMatcher(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
 
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
@@ -153,7 +155,7 @@ public class TestPaymentInSimpleNetwork {
         ASSET_CODE, transferAmount);
 
     accountListener.waitForCredits(PAY_WAIT,
-        AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
+        creditMatcher(secondTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
 
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
@@ -163,10 +165,9 @@ public class TestPaymentInSimpleNetwork {
         firstTenantId,
         ASSET_CODE, transferAmount);
 
-    accountListener.waitForCredits(PAY_WAIT*3,
-          AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
-          AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, secondTenantId),
-          AccountListener.credit(firstTenantId, BigDecimal.TEN, ASSET_CODE, firstTenantId));
+    accountListener.waitForCredits(PAY_WAIT,
+        creditMatcher(firstTenantId, BigDecimal.TEN, ASSET_CODE,
+            vaultMatcher(secondTenantId, firstTenantId)));
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -189,11 +190,8 @@ public class TestPaymentInSimpleNetwork {
   public void overlappingPayments() throws Exception {
     logger.info("overlappingPayments test begin");
 
-    final AccountListener firstTenantAccountListener =
+    final AccountListener accountListener =
         new AccountListener(serverAddress, firstTenantId, secondTenantId);
-
-    final AccountListener secondTenantAccountListener =
-        new AccountListener(serverAddress, secondTenantId, firstTenantId);
 
     final BigDecimal transferAmount = BigDecimal.TEN;
     final BigDecimal doubleTransferAmount = transferAmount.add(transferAmount);
@@ -204,13 +202,11 @@ public class TestPaymentInSimpleNetwork {
         firstTenantId,
         ASSET_CODE, doubleTransferAmount);
 
-    firstTenantAccountListener
+    accountListener
         .waitForCredits(PAY_WAIT,
-            AccountListener.credit(firstTenantId, doubleTransferAmount, ASSET_CODE, secondTenantId));
-    secondTenantAccountListener
-        .waitForCredits(PAY_WAIT,
-            AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
-            AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
+            creditMatcher(firstTenantId, doubleTransferAmount, ASSET_CODE, secondTenantId),
+            creditMatcher(secondTenantId, transferAmount, ASSET_CODE, vaultMatcher(firstTenantId, secondTenantId)),
+            creditMatcher(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -224,8 +220,8 @@ public class TestPaymentInSimpleNetwork {
         secondTenantId,
         ASSET_CODE, transferAmount);
 
-    secondTenantAccountListener.waitForCredits(PAY_WAIT,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId));
+    accountListener.waitForCredits(PAY_WAIT,
+        creditMatcher(secondTenantId, transferAmount, ASSET_CODE, vaultMatcher(firstTenantId, secondTenantId)));
   }
 
 
@@ -237,23 +233,20 @@ public class TestPaymentInSimpleNetwork {
     final BigDecimal transferIncrement = BigDecimal.valueOf(99.99);
     final BigDecimal lastBit = BigDecimal.valueOf(0.1);
 
-/*    final AccountListener firstTenantAccountListener =
-        new AccountListener(serverAddress, firstTenantId, secondTenantId);*/
+    final AccountListener accountListener =
+        new AccountListener(serverAddress, firstTenantId, secondTenantId);
 
-    final AccountListener secondTenantAccountListener =
-        new AccountListener(serverAddress, secondTenantId, firstTenantId);
-
-    //Approach the credit limit, then go back down to zero.
+    //Approach the creditMatcher limit, then go back down to zero.
     Collections.nCopies(10, transferIncrement).parallelStream().forEach(
         (transferAmount) -> makePayment(firstTenantId, firstTenantApiKey, secondTenantId,
             ASSET_CODE, transferAmount));
 
     {
-      final List<AccountListener.Credit> transfers = new ArrayList<>();
+      final List<AccountListener.CreditMatcher> transfers = new ArrayList<>();
       transfers.addAll(Collections.nCopies(10,
-          AccountListener.credit(secondTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
+          creditMatcher(secondTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
 
-      secondTenantAccountListener.waitForCredits(PAY_WAIT * 3, transfers);
+      accountListener.waitForCredits(PAY_WAIT * 3, transfers);
     }
 
     checkBalance(secondTenantId, secondTenantApiKey,
@@ -271,26 +264,19 @@ public class TestPaymentInSimpleNetwork {
             ASSET_CODE, transferAmount));
 
     {
-      final List<AccountListener.Credit> transfers = new ArrayList<>();
+      final List<AccountListener.CreditMatcher> transfers = new ArrayList<>();
       transfers.addAll(Collections.nCopies(10,
-          AccountListener.credit(firstTenantId, transferIncrement, ASSET_CODE, secondTenantId)));
+          creditMatcher(firstTenantId, transferIncrement, ASSET_CODE, vaultMatcher(firstTenantId, secondTenantId))));
 
-      //firstTenantAccountListener.waitForCredits(PAY_WAIT * 3, transfers);
-      Thread.sleep(PAY_WAIT*3);
+      accountListener.waitForCredits(PAY_WAIT * 3, transfers);
 
-      secondTenantAccountListener.waitForCreditsToAccumulate(PAY_WAIT * 3,
-          AccountListener
-              .credit(secondTenantId, transferIncrement.multiply(BigDecimal.TEN), ASSET_CODE,
-                  secondTenantId));
+      accountListener.waitForCreditsToAccumulate(PAY_WAIT * 3,
+          creditMatcher(secondTenantId, transferIncrement.multiply(BigDecimal.TEN), ASSET_CODE,
+              vaultMatcher(firstTenantId, secondTenantId)));
 
-      /*firstTenantAccountListener.waitForCreditsToAccumulate(PAY_WAIT * 3,
-          AccountListener.credit(
-              firstTenantId,
-              transferIncrement.multiply(BigDecimal.TEN),
-              ASSET_CODE,
-              firstTenantId));*/
-
-      Thread.sleep(PAY_WAIT*3);
+      accountListener.waitForCreditsToAccumulate(PAY_WAIT * 3,
+          creditMatcher(firstTenantId, transferIncrement.multiply(BigDecimal.TEN), ASSET_CODE,
+              vaultMatcher(firstTenantId, secondTenantId)));
     }
 
     checkBalance(firstTenantId, firstTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(secondTenantId),
@@ -299,7 +285,7 @@ public class TestPaymentInSimpleNetwork {
         BigDecimal.ZERO);
 
 
-    //Approach the credit limit again, then go to exactly the credit limit
+    //Approach the creditMatcher limit again, then go to exactly the creditMatcher limit
     Collections.nCopies(10, transferIncrement).parallelStream().forEach(
         (transferAmount) -> makePayment(firstTenantId, firstTenantApiKey, secondTenantId,
             ASSET_CODE, transferAmount));
@@ -307,33 +293,31 @@ public class TestPaymentInSimpleNetwork {
         lastBit);
 
     {
-      final List<AccountListener.Credit> transfers = new ArrayList<>();
-      transfers.addAll(Collections.nCopies(10,
-          AccountListener.credit(secondTenantId, transferIncrement, ASSET_CODE, firstTenantId)));
-      transfers.add(AccountListener.credit(secondTenantId, lastBit, ASSET_CODE, firstTenantId));
+      final List<AccountListener.CreditMatcher> transfers = new ArrayList<>();
+      transfers.addAll(Collections.nCopies(10, creditMatcher(secondTenantId, transferIncrement, ASSET_CODE,
+          firstTenantId)));
+      transfers.add(creditMatcher(secondTenantId, lastBit, ASSET_CODE, firstTenantId));
 
-      secondTenantAccountListener.waitForCredits(PAY_WAIT * 3, transfers);
+      accountListener.waitForCredits(PAY_WAIT * 3, transfers);
     }
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         TRUST_LIMIT);
 
 
-    //Now try to go over the credit limit.
+    //Now try to go over the creditMatcher limit.
     makePayment(firstTenantId, firstTenantApiKey, secondTenantId, ASSET_CODE, lastBit);
 
-    secondTenantAccountListener.waitForCredits(PAY_WAIT,
-        AccountListener.credit(secondTenantId, lastBit, ASSET_CODE, firstTenantId));
+    accountListener.waitForCredits(PAY_WAIT,
+        creditMatcher(secondTenantId, lastBit, ASSET_CODE, vaultMatcher(firstTenantId, secondTenantId)));
 
     checkBalance(secondTenantId, secondTenantApiKey, ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
         TRUST_LIMIT);
 
     //Zero out balance for next test.
     makePayment(secondTenantId, secondTenantApiKey, firstTenantId, ASSET_CODE, TRUST_LIMIT);
-    /*firstTenantAccountListener.waitForCredits(PAY_WAIT,
-          AccountListener.credit(firstTenantId, TRUST_LIMIT, ASSET_CODE, secondTenantId));*/
-
-    Thread.sleep(PAY_WAIT);
+    accountListener.waitForCredits(PAY_WAIT,
+          creditMatcher(firstTenantId, TRUST_LIMIT, ASSET_CODE, vaultMatcher(firstTenantId, secondTenantId)));
   }
 
   //TODO: add a test for installation balance.

@@ -17,23 +17,27 @@ package org.fineract.module.stellar;
 
 
 import com.jayway.restassured.RestAssured;
+import org.fineract.module.stellar.fineractadapter.Adapter;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.fineract.module.stellar.configuration.BridgeConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
+import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.UUID;
 
+import static org.fineract.module.stellar.AccountListener.creditMatcher;
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.*;
 import static org.fineract.module.stellar.StellarBridgeTestHelpers.createAndDestroyTrustLine;
 
+@Component
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringApplicationConfiguration(BridgeConfiguration.class)
 @WebIntegrationTest({
@@ -56,6 +60,8 @@ public class TestPaymentInIncompleteNetwork {
   @Value("${stellar.horizon-address}")
   String serverAddress;
 
+  @Autowired Adapter adapter;
+
   static FineractStellarTestRig testRig;
 
 
@@ -75,6 +81,8 @@ public class TestPaymentInIncompleteNetwork {
 
   @Before
   public void setupTest() {
+    RestAdapterProviderMockProvider.mockFineract(adapter, testRig.getMifosAddress());
+
     RestAssured.port = bridgePort;
 
     firstTenantId = UUID.randomUUID().toString();
@@ -126,12 +134,9 @@ public class TestPaymentInIncompleteNetwork {
 
     makePayment(firstTenantId, firstTenantApiKey, thirdTenantId, ASSET_CODE, BigDecimal.TEN);
 
-    final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
+    accountListener.waitForCredits(
         MAX_PAY_WAIT,
-        AccountListener.credit(secondTenantId, BigDecimal.TEN, ASSET_CODE, thirdTenantId));
-
-    if (missingCredits.isEmpty())
-      logger.info("A credit which shouldn't have happened did.");
+        creditMatcher(secondTenantId, BigDecimal.TEN, ASSET_CODE, thirdTenantId));
 
     checkBalance(thirdTenantId, thirdTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
@@ -153,15 +158,11 @@ public class TestPaymentInIncompleteNetwork {
         thirdTenantId,
         ASSET_CODE, transferAmount);
 
-    {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-          MAX_PAY_WAIT,
-          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
-          AccountListener.credit(thirdTenantId, transferAmount, ASSET_CODE, secondTenantId));
+    accountListener.waitForCredits(
+        MAX_PAY_WAIT,
+        creditMatcher(secondTenantId, transferAmount, ASSET_CODE, firstTenantId),
+        creditMatcher(thirdTenantId, transferAmount, ASSET_CODE, secondTenantId));
 
-      if (!missingCredits.isEmpty())
-        logger.info("Missing credits: " + missingCredits);
-    }
 
     checkBalance(secondTenantId, secondTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(firstTenantId),
@@ -175,16 +176,12 @@ public class TestPaymentInIncompleteNetwork {
         firstTenantId,
         ASSET_CODE, transferAmount);
 
-    {
-      final List<AccountListener.Credit> missingCredits = accountListener.waitForCredits(
-          MAX_PAY_WAIT*5,
-          AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, secondTenantId),
-          AccountListener.credit(firstTenantId, transferAmount, ASSET_CODE, firstTenantId),
-          AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
+    accountListener.waitForCredits(
+        MAX_PAY_WAIT*5,
+        creditMatcher(firstTenantId, transferAmount, ASSET_CODE, secondTenantId),
+        creditMatcher(firstTenantId, transferAmount, ASSET_CODE, firstTenantId),
+        creditMatcher(secondTenantId, transferAmount, ASSET_CODE, secondTenantId));
 
-      if (!missingCredits.isEmpty())
-        logger.info("Missing credits: " + missingCredits);
-    }
 
     checkBalance(firstTenantId, firstTenantApiKey,
         ASSET_CODE, tenantVaultStellarAddress(secondTenantId),

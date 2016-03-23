@@ -47,7 +47,7 @@ public class AccountListener {
     private final String assetCode;
     private final String issuingTenantVault;
 
-    public Credit(final String toTenantId,
+    private Credit(final String toTenantId,
         final BigDecimal amount,
         final String assetCode, final String issuingTenantVault) {
       this.toTenantId = toTenantId;
@@ -82,11 +82,62 @@ public class AccountListener {
     }
   }
 
-  static Credit credit(final String toTenantId,
-      final BigDecimal amount,
-      final String assetCode, final String issuingTenantVault)
+  static class CreditMatcher
   {
-    return new Credit(toTenantId, amount, assetCode, issuingTenantVault);
+    private final String toTenantId;
+    private final BigDecimal amount;
+    private final String assetCode;
+    private final Set<String> issuingTenantVaults;
+
+    private CreditMatcher(final String toTenantId,
+        final BigDecimal amount,
+        final String assetCode,
+        final Set<String> issuingTenantVaults) {
+      this.toTenantId = toTenantId;
+      this.amount = amount;
+      this.assetCode = assetCode;
+      this.issuingTenantVaults = issuingTenantVaults;
+    }
+
+    boolean matches(final Credit credit)
+    {
+      return toTenantId.equals(credit.toTenantId)  &&
+          amount.compareTo(credit.amount) == 0 &&
+          assetCode.equals(credit.assetCode) &&
+          issuingTenantVaults.contains(credit.issuingTenantVault);
+    }
+
+    @Override public String toString() {
+      return "CreditMatcher{" +
+          "toTenantId='" + toTenantId + '\'' +
+          ", amount=" + amount +
+          ", assetCode='" + assetCode + '\'' +
+          ", issuingTenantVaults=" + issuingTenantVaults +
+          '}';
+    }
+  }
+
+  static Set<String> vaultMatcher(final String... issuingTenantVaults)
+  {
+    final Set<String> ret = new HashSet<>();
+
+    Collections.addAll(ret, issuingTenantVaults);
+
+    return ret;
+  }
+
+  static CreditMatcher creditMatcher(final String toTenantId,
+      final BigDecimal amount,
+      final String assetCode, final Set<String> issuingTenantVaults)
+  {
+    return new CreditMatcher(toTenantId, amount, assetCode, issuingTenantVaults);
+  }
+
+  static CreditMatcher creditMatcher(final String toTenantId,
+      final BigDecimal amount,
+      final String assetCode, final String issuingTenantVaults)
+  {
+    return new CreditMatcher(toTenantId, amount, assetCode, vaultMatcher(issuingTenantVaults));
   }
 
   class Listener implements EventListener<EffectResponse> {
@@ -137,8 +188,6 @@ public class AccountListener {
   private final Set<String> operationsAlreadySeen = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final Map<String, String> stellarIdToTenantId = new HashMap<>();
   private final Map<String, String> stellarVaultIdToTenantId = new HashMap<>();
-  private final Map<String, String> tenantIdToStellarId = new HashMap<>();
-  private final String targetTenantId;
 
   AccountListener(final String serverAddress, final String... tenantIds)
   {
@@ -150,10 +199,7 @@ public class AccountListener {
         .map(tenantId -> new Pair<>(getStellarAccountIdForTenantId(tenantId), tenantId))
         .filter(pair -> pair.getKey().isPresent())
         .forEachOrdered(pair ->
-        {
-          stellarIdToTenantId.put(pair.getKey().get(), pair.getValue());
-          tenantIdToStellarId.put(pair.getValue(), pair.getKey().get());
-        }
+          stellarIdToTenantId.put(pair.getKey().get(), pair.getValue())
         );
 
 
@@ -164,10 +210,8 @@ public class AccountListener {
         .forEachOrdered(pair ->
             stellarVaultIdToTenantId.put(pair.getKey().get(), pair.getValue()));
 
-    targetTenantId = tenantIds[0];
-
-    //Listen for only the first account on the list (otherwise payment events are sent for both send and receive).
-    installPaymentListener(serverAddress, tenantIdToStellarId.get(targetTenantId));
+    stellarIdToTenantId.entrySet().stream().forEach(
+        mapEntry -> installPaymentListener(serverAddress, mapEntry.getKey()));
   }
 
   private void installPaymentListener(final String serverAddress, final String stellarAccountId) {
@@ -181,60 +225,68 @@ public class AccountListener {
     effectsRequestBuilder.stream(listener);
   }
 
-  public List<Credit> waitForCredits(final long maxWait, final Credit... creditsExpected)
+  public void waitForCredits(final long maxWait, final CreditMatcher... creditsExpected)
       throws Exception {
-    return waitForCredits(maxWait, Arrays.asList(creditsExpected));
+    waitForCredits(maxWait, Arrays.asList(creditsExpected));
   }
 
-  public List<Credit> waitForCredits(final long maxWait, final List<Credit> creditsExpected)
+  public void waitForCredits(final long maxWait, final List<CreditMatcher> creditsExpected)
       throws Exception {
-    logger.info("Waiting {} milliseconds for credits to tenant {}.", maxWait, targetTenantId);
+    logger.info("Waiting maximum {} milliseconds for credits {}.", maxWait, creditsExpected);
 
-    final List<Credit> incompleteCredits = new LinkedList<>(creditsExpected);
+    final List<CreditMatcher> incompleteCredits = new LinkedList<>(creditsExpected);
 
     final long startTime = new Date().getTime();
+    long waitedSoFar = 0;
 
     try (final Cleanup cleanup = new Cleanup()) {
       while (!incompleteCredits.isEmpty()) {
         final Credit credit = credits.poll(maxWait, TimeUnit.MILLISECONDS);
 
         final long now = new Date().getTime();
-        final long waitedSoFar = now - startTime;
+        waitedSoFar = now - startTime;
 
         if (credit != null) {
-          final boolean matched = incompleteCredits.remove(credit);
-          if (!matched)
+          final Optional<CreditMatcher> match = incompleteCredits.stream()
+              .filter(incompleteCredit -> incompleteCredit.matches(credit)).findAny();
+          match.ifPresent(incompleteCredits::remove);
+
+          if (!match.isPresent())
             cleanup.addStep(() -> credits.put(credit));
         }
 
 
         if ((waitedSoFar > maxWait) && credits.isEmpty()) {
-          logger.info("Wait time for tenant {} is up, and there are {} incomplete credits {}",
-              targetTenantId, incompleteCredits.size(), incompleteCredits);
-          return incompleteCredits;
+          logger.info("Waited {} milliseconds, and there are {} incomplete credits {} of the expected credits {}",
+              waitedSoFar, incompleteCredits.size(), incompleteCredits, creditsExpected);
+          return;
         }
       }
 
-      logger.info("Wait time for tenant {} is up, and there are {} incomplete credits {}",
-          targetTenantId, incompleteCredits.size(), incompleteCredits);
-      return incompleteCredits;
+      logger.info("Waited {} milliseconds, and there are {} incomplete credits {} of the expected credits {}",
+          waitedSoFar, incompleteCredits.size(), incompleteCredits, creditsExpected);
     }
   }
 
-  public BigDecimal waitForCreditsToAccumulate(final long maxWait, final Credit sumCreditExpected)
+  public void waitForCreditsToAccumulate(final long maxWait, final CreditMatcher sumCreditExpected)
     throws Exception {
-    logger.info("Waiting {} milliseconds for credit accumulation to tenant {}.", maxWait, targetTenantId);
+    logger.info("Waiting maximum {} milliseconds for creditMatcher accumulation to tenant {}.", maxWait, sumCreditExpected.toTenantId);
     BigDecimal missingBalance = sumCreditExpected.amount;
 
     final long startTime = new Date().getTime();
+    long waitedSoFar = 0;
 
     try (final Cleanup cleanup = new Cleanup()) {
       while (missingBalance.compareTo(BigDecimal.ZERO) > 0)
       {
         final Credit credit = credits.poll(maxWait, TimeUnit.MILLISECONDS);
+
+        final long now = new Date().getTime();
+        waitedSoFar = now - startTime;
+
         if (credit != null) {
           final boolean matched = sumCreditExpected.assetCode.equals(credit.assetCode) &&
-              sumCreditExpected.issuingTenantVault.equals(credit.issuingTenantVault) &&
+              sumCreditExpected.issuingTenantVaults.contains(credit.issuingTenantVault) &&
               sumCreditExpected.toTenantId.equals(credit.toTenantId);
           if (!matched)
             cleanup.addStep(() -> credits.put(credit));
@@ -242,20 +294,17 @@ public class AccountListener {
             missingBalance = missingBalance.subtract(credit.amount);
         }
 
-        final long now = new Date().getTime();
-        final long waitedSoFar = now - startTime;
 
         if ((waitedSoFar > maxWait) && credits.isEmpty()) {
 
-          logger.info("Wait time for tenant {} is up, and there missing balance is {}",
-              targetTenantId, missingBalance);
-          return missingBalance;
+          logger.info("Waited {} milliseconds for creditMatcher accumulation is up.  Missing balance is {} of {}",
+              waitedSoFar, missingBalance, sumCreditExpected);
+          return;
         }
       }
 
-      logger.info("Wait time for tenant {} is up, and there missing balance is {}",
-          targetTenantId, missingBalance);
-      return missingBalance;
+      logger.info("Waited {} milliseconds for creditMatcher accumulation is up.  Missing balance is {} of {}",
+          waitedSoFar, missingBalance, sumCreditExpected);
     }
   }
 }

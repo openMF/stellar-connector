@@ -244,7 +244,7 @@ public class TestVault {
     makePayment(tenantId, tenantApiKey, secondTenantId, ASSET_CODE, transferAmount);
 
     accountListener.waitForCredits(MAX_PAY_WAIT,
-        AccountListener.credit(secondTenantId, transferAmount, ASSET_CODE, tenantId));
+        AccountListener.creditMatcher(secondTenantId, transferAmount, ASSET_CODE, tenantId));
 
     checkBalance(tenantId, tenantApiKey, ASSET_CODE,
         tenantVaultStellarAddress(tenantId), BigDecimal.valueOf(5));
@@ -265,7 +265,7 @@ public class TestVault {
     //Zero out balance
     makePayment(secondTenantId, secondTenantApiKey, tenantId, ASSET_CODE, transferAmount);
     accountListener.waitForCredits(MAX_PAY_WAIT,
-        AccountListener.credit(tenantId, transferAmount, ASSET_CODE, secondTenantId));
+        AccountListener.creditMatcher(tenantId, transferAmount, ASSET_CODE, secondTenantId));
   }
 
   @Test
@@ -309,7 +309,7 @@ public class TestVault {
     makePayment(secondTenantId, secondTenantApiKey, tenantId, ASSET_CODE, transferAmount);
 
     accountListener.waitForCredits(MAX_PAY_WAIT,
-        AccountListener.credit(tenantId, transferAmount, ASSET_CODE, secondTenantId));
+        AccountListener.creditMatcher(tenantId, transferAmount, ASSET_CODE, secondTenantId));
 
     checkBalance(tenantId, tenantApiKey, ASSET_CODE,
         tenantVaultStellarAddress(secondTenantId), transferAmount);
