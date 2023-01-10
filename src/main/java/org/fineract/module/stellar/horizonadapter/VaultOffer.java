@@ -63,8 +63,8 @@ class VaultOffer {
 
     Page<OfferResponse> offers;
     try {
-      offers = server.offers().forAccount(accountKeyPair).execute();
-    } catch (final IOException e) {
+      offers = server.offers().forAccount(accountKeyPair.getAccountId()).execute();
+    } catch (final Exception e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress("");
     }
 

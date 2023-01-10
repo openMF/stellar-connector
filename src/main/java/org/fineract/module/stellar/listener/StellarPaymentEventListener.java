@@ -58,8 +58,6 @@ public class StellarPaymentEventListener implements ApplicationListener<StellarP
     final AccountBridgePersistency accountBridge =
         accountBridgeRepositoryDecorator.getBridge(event.getMifosTenantId());
 
-
-
     try
     {
       if (accountBridge == null)

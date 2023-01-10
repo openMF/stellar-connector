@@ -15,27 +15,31 @@
  */
 package org.fineract.module.stellar.fineractadapter;
 
-import com.squareup.okhttp.OkHttpClient;
+//import com.squareup.okhttp.OkHttpClient;
 import org.springframework.stereotype.Component;
-import retrofit.RestAdapter;
-import retrofit.client.OkClient;
+//import retrofit.RestAdapter;
+//import retrofit.client.OkClient;
 
 import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import okhttp3.OkHttpClient;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 @Component
 public class RestAdapterProvider {
 
-  public RestAdapter get(final String endpoint) {
+  public Retrofit get(final String endpoint) {
 
     final OkHttpClient okHttpClient = this.createClient();
 
-    return new RestAdapter.Builder()
+    /*return new RestAdapter.Builder()
         .setEndpoint(endpoint)
         .setClient(new OkClient(okHttpClient))
-        .build();
+        .build();*/
+    return new Retrofit.Builder().baseUrl(endpoint).client(okHttpClient).addConverterFactory(GsonConverterFactory.create()).build();
   }
 
   OkHttpClient createClient() {
@@ -67,10 +71,10 @@ public class RestAdapterProvider {
     } catch (final java.security.GeneralSecurityException ignored) {
     }
 
-    try {
-      client.setHostnameVerifier((hostname, session) -> true);
+    try {      
+      //client.setHostnameVerifier((hostname, session) -> true);
       if (ctx != null) {
-        client.setSslSocketFactory(ctx.getSocketFactory());
+        client.sslSocketFactory();
       }
     } catch (final Exception ignored) {
     }

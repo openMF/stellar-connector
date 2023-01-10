@@ -15,7 +15,9 @@
  */
 package org.fineract.module.stellar.listener;
 
-import javafx.util.Pair;
+//import javafx.util.Pair;
+//import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.math3.util.Pair;
 import org.fineract.module.stellar.federation.StellarAccountId;
 import org.fineract.module.stellar.horizonadapter.HorizonServerUtilities;
 import org.fineract.module.stellar.horizonadapter.StellarOfferAdjustmentFailedException;

@@ -16,7 +16,7 @@
 package org.fineract.module.stellar.horizonadapter;
 
 import org.fineract.module.stellar.federation.StellarAccountId;
-import org.stellar.sdk.*;
+//import org.stellar.sdk.*;
 import org.stellar.sdk.responses.AccountResponse;
 
 import java.math.BigDecimal;
@@ -26,6 +26,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.stellar.sdk.Asset;
+import org.stellar.sdk.AssetTypeCreditAlphaNum;
+import org.stellar.sdk.AssetTypeNative;
+import org.stellar.sdk.KeyPair;
 
 class StellarAccountHelpers {
   static String getAssetCode(final Asset asset) {

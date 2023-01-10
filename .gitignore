@@ -19,3 +19,4 @@ hs_err_pid*
 
 # gradle-wrapper so anyone can work with it without pre-installing gradle #
 !gradle/wrapper/gradle-wrapper.jar
+/target/
