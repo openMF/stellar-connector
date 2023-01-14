@@ -28,9 +28,10 @@ import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.requests.EffectsRequestBuilder;
 
 import javax.annotation.PostConstruct;
-import javax.validation.constraints.NotNull;
+//import javax.validation.constraints.NotNull;
 import java.net.URI;
 import java.util.Optional;
+import org.jetbrains.annotations.NotNull;
 
 @Component
 public class HorizonServerPaymentObserver {

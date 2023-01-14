@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 //import retrofit.RetrofitError;
 
 import java.math.BigDecimal;
+import org.fineract.module.stellar.error.RetrofitException;
 import retrofit2.Retrofit;
 
 @Component
@@ -59,9 +60,9 @@ public class Adapter {
 
       clientService.createSavingsAccountTransaction(STELLAR_TRANSFER_ACCOUNT, "withdrawal", command);
     }
-    catch (final RetrofitError ex)
+    catch (final RetrofitException ex)
     {
-      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().getReason());
+      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().message());
     }
   }
 
@@ -74,7 +75,7 @@ public class Adapter {
       final Long eventId) throws FineractBridgeAccountAdjustmentFailedException
   {
     try {
-      final RestAdapter restAdapter = this.restAdapterProvider.get(endpoint);
+      final Retrofit restAdapter = this.restAdapterProvider.get(endpoint);
       final FineractClientService clientService = restAdapter.create(FineractClientService.class);
 
       final JournalEntryCommand command = new JournalEntryCommand();
@@ -87,9 +88,9 @@ public class Adapter {
 
       clientService.createSavingsAccountTransaction(STELLAR_TRANSFER_ACCOUNT, "deposit", command);
     }
-    catch (final RetrofitError ex)
+    catch (final RetrofitException ex)
     {
-      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().getReason());
+      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().message());
     }
   }
 

@@ -83,7 +83,7 @@ public class HorizonServerUtilities {
             final KeyPair accountKeyPair = KeyPair.fromAccountId(accountId);
             final StellarAccountHelpers accountHelper = getAccount(accountKeyPair);
             final Long sequenceNumber = accountHelper.get().getSequenceNumber();
-            return new Account(accountKeyPair, sequenceNumber);
+            return new Account(accountKeyPair.getAccountId(), sequenceNumber);
           }
         });
 
