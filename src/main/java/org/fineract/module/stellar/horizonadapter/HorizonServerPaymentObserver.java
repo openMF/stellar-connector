@@ -15,6 +15,7 @@
  */
 package org.fineract.module.stellar.horizonadapter;
 
+import java.net.URI;
 import org.fineract.module.stellar.federation.StellarAccountId;
 import org.fineract.module.stellar.persistencedomain.StellarCursorPersistency;
 import org.fineract.module.stellar.repository.AccountBridgeRepository;
@@ -28,10 +29,7 @@ import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.requests.EffectsRequestBuilder;
 
 import javax.annotation.PostConstruct;
-//import javax.validation.constraints.NotNull;
-import java.net.URI;
 import java.util.Optional;
-import org.jetbrains.annotations.NotNull;
 
 @Component
 public class HorizonServerPaymentObserver {
@@ -45,10 +43,9 @@ public class HorizonServerPaymentObserver {
   private final Logger logger;
 
   @PostConstruct
-  void init()
-  {
+  void init() {
+      
     final Optional<String> cursor = getCurrentCursor();
-
     accountBridgeRepository.findAll()
         .forEach(bridge -> setupListeningForAccount(
                     StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
@@ -59,30 +56,28 @@ public class HorizonServerPaymentObserver {
       final AccountBridgeRepository accountBridgeRepository,
       final StellarCursorRepository stellarCursorRepository,
       final HorizonServerEffectsListener listener,
-      final @Qualifier("stellarBridgeLogger") Logger logger)
-  {
+      final @Qualifier("stellarBridgeLogger") Logger logger) {
+      
     this.accountBridgeRepository = accountBridgeRepository;
     this.stellarCursorRepository = stellarCursorRepository;
 
     this.listener = listener;
-
     this.logger = logger;
   }
 
-  public void setupListeningForAccount(final StellarAccountId stellarAccountId)
-  {
+  public void setupListeningForAccount(final StellarAccountId stellarAccountId) {
     setupListeningForAccount(stellarAccountId, Optional.empty());
   }
 
   private Optional<String> getCurrentCursor() {
-    final Optional<StellarCursorPersistency> cursorPersistency
-        = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
-
+      
+    final Optional<StellarCursorPersistency> cursorPersistency = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
     return cursorPersistency.map(StellarCursorPersistency::getCursor);
+    
   }
 
   private void setupListeningForAccount(
-      @NotNull final StellarAccountId stellarAccountId, @NotNull final Optional<String> cursor)
+      @org.jetbrains.annotations.NotNull final StellarAccountId stellarAccountId, @org.jetbrains.annotations.NotNull final Optional<String> cursor)
   {
     logger.info("HorizonServerPaymentObserver.setupListeningForAccount {}, cursor {}",
         stellarAccountId.getPublicKey(), cursor);

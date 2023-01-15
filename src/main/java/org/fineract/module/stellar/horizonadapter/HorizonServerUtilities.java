@@ -18,7 +18,7 @@ package org.fineract.module.stellar.horizonadapter;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import javafx.util.Pair;
+import java.util.AbstractMap;
 import org.fineract.module.stellar.service.UnexpectedException;
 import org.fineract.module.stellar.federation.StellarAccountId;
 import org.slf4j.Logger;
@@ -26,17 +26,30 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.stellar.sdk.*;
-import org.stellar.sdk.responses.*;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
+
+import org.stellar.sdk.Account;
+import org.stellar.sdk.AccountMergeOperation;
+import org.stellar.sdk.Asset;
+import org.stellar.sdk.ChangeTrustOperation;
+import org.stellar.sdk.CreateAccountOperation;
+import org.stellar.sdk.KeyPair;
+import org.stellar.sdk.ManageBuyOfferOperation;
+import org.stellar.sdk.Memo;
+import org.stellar.sdk.Server;
+import org.stellar.sdk.SetOptionsOperation;
+import org.stellar.sdk.Transaction;
+import org.stellar.sdk.responses.AccountResponse;
+import org.stellar.sdk.responses.Page;
+import org.stellar.sdk.responses.PathResponse;
+import org.stellar.sdk.responses.SubmitTransactionResponse;
 
 @Component
 public class HorizonServerUtilities {
@@ -61,7 +74,7 @@ public class HorizonServerUtilities {
 
   private final LoadingCache<String, Account> accounts;
 
-  private final LoadingCache<Pair<String, StellarAccountId>, Map<VaultOffer, Long>> offers;
+  private final LoadingCache<AbstractMap.SimpleEntry<String, StellarAccountId>, Map<VaultOffer, Long>> offers;
 
   @Autowired
   HorizonServerUtilities(@Qualifier("stellarBridgeLogger") final Logger logger)
@@ -88,9 +101,9 @@ public class HorizonServerUtilities {
         });
 
     offers = CacheBuilder.newBuilder().build(
-        new CacheLoader<Pair<String, StellarAccountId>, Map<VaultOffer, Long>>() {
+        new CacheLoader<AbstractMap.SimpleEntry<String, StellarAccountId>, Map<VaultOffer, Long>>() {
           @Override
-          public Map<VaultOffer, Long> load(final Pair<String, StellarAccountId> accountIdVaultId) {
+          public Map<VaultOffer, Long> load(final AbstractMap.SimpleEntry<String, StellarAccountId> accountIdVaultId) {
             return VaultOffer.getVaultOffers(
                 server,
                 accountIdVaultId.getKey(),
@@ -186,7 +199,7 @@ public class HorizonServerUtilities {
 
     account.getVaultBalancesStream(stellarVaultAccountId.getPublicKey()).forEach(
         balance -> adjustVaultIssuedAssets(stellarAccountId, stellarAccountPrivateKey,
-            stellarVaultAccountId, stellarVaultAccountPrivateKey, balance.getAssetCode(),
+            stellarVaultAccountId, stellarVaultAccountPrivateKey, balance.getAssetCode().orNull(),
             BigDecimal.ZERO));
 
     account = getAccount(accountKeyPair); //Get the new balances.
@@ -435,8 +448,8 @@ public class HorizonServerUtilities {
     final BigDecimal balanceOfVaultAsset = accountHelper.getBalanceOfAsset(vaultAsset);
     final BigDecimal remainingTrustInVaultAsset = accountHelper.getRemainingTrustInAsset(vaultAsset);
 
-    final Pair<String, StellarAccountId> offerKey =
-        new Pair<>(accountKeyPair.getAccountId(), vaultAccountId);
+    final AbstractMap.SimpleEntry<String, StellarAccountId> offerKey =
+        new AbstractMap.SimpleEntry<>(accountKeyPair.getAccountId(), vaultAccountId);
     offers.refresh(offerKey);
     final Map<VaultOffer, Long> vaultOffers = offers.getUnchecked(offerKey);
 
@@ -472,20 +485,20 @@ public class HorizonServerUtilities {
       final AccountResponse.Balance balance)
   {
     return Optional.ofNullable(
-        vaultOffers.get(new VaultOffer(balance.getAssetCode(), balance.getAssetIssuer())));
+        vaultOffers.get(new VaultOffer(balance.getAssetCode().orNull(), balance.getAssetIssuer().orNull())));
   }
 
-  private ManageOfferOperation offerOperation(
+  private ManageBuyOfferOperation offerOperation(
       final KeyPair sourceAccountKeyPair,
       final Asset fromAsset,
       final Asset toAsset,
       final BigDecimal amount,
       final Optional<Long> offerId)
   {
-    final ManageOfferOperation.Builder offerOperationBuilder
-        = new ManageOfferOperation.Builder(
+    final ManageBuyOfferOperation.Builder offerOperationBuilder
+        = new ManageBuyOfferOperation.Builder(
         fromAsset, toAsset, StellarAccountHelpers.bigDecimalToStellarBalance(amount), "1");
-    offerOperationBuilder.setSourceAccount(sourceAccountKeyPair);
+    offerOperationBuilder.setSourceAccount(sourceAccountKeyPair.getAccountId());
 
     offerId.ifPresent(offerOperationBuilder::setOfferId);
 
@@ -560,7 +573,7 @@ public class HorizonServerUtilities {
     try {
       installationAccount = server.accounts().account(installationAccountKeyPair);
     }
-    catch (final IOException e) {
+    catch (final Exception e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
     }
 
@@ -590,7 +603,7 @@ public class HorizonServerUtilities {
     final Set<Asset> targetAssets = targetAccount.findAssetsWithTrust(amount, assetCode);
     final Set<Asset> sourceAssets = sourceAccount.findAssetsWithBalance(amount, assetCode);
 
-    final Optional<Pair<Asset, Asset>> assetPair = findAnyMatchingAssetPair(
+    final Optional<AbstractMap.SimpleEntry<Asset, Asset>> assetPair = findAnyMatchingAssetPair(
         amount, sourceAssets, targetAssets, sourceAccountKeyPair, targetAccountKeyPair);
     if (!assetPair.isPresent())
       throw StellarPaymentFailedException.noPathExists(assetCode);
@@ -600,7 +613,7 @@ public class HorizonServerUtilities {
         stellarAccountPrivateKey);
   }
 
-  private Optional<Pair<Asset, Asset>> findAnyMatchingAssetPair(
+  private Optional<AbstractMap.SimpleEntry<Asset, Asset>> findAnyMatchingAssetPair(
       final BigDecimal amount,
       final Set<Asset> sourceAssets,
       final Set<Asset> targetAssets,
@@ -618,7 +631,7 @@ public class HorizonServerUtilities {
             .destinationAsset(targetAsset)
             .destinationAmount(StellarAccountHelpers.bigDecimalToStellarBalance(amount))
             .execute();
-      } catch (final IOException e) {
+      } catch (final Exception e) {
         return Optional.empty();
       }
 
@@ -629,7 +642,7 @@ public class HorizonServerUtilities {
           {
             if (sourceAssets.contains(path.getSourceAsset()))
             {
-              return Optional.of(new Pair<>(path.getSourceAsset(), targetAsset));
+              return Optional.of(new AbstractMap.SimpleEntry<>(path.getSourceAsset(), targetAsset));
             }
           }
         }
@@ -637,11 +650,8 @@ public class HorizonServerUtilities {
         try {
           paths = ((paths.getLinks() == null) || (paths.getLinks().getNext() == null)) ?
               null : paths.getNextPage();
-        } catch (final URISyntaxException e) {
+        } catch (final Exception e) {
           throw new UnexpectedException();
-        }
-        catch (final IOException e) {
-          return Optional.empty();
         }
       }
     }

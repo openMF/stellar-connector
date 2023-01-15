@@ -16,8 +16,8 @@
 package org.fineract.module.stellar.listener;
 
 //import javafx.util.Pair;
-//import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.math3.util.Pair;
+import java.util.AbstractMap;
+import java.util.Optional;
 import org.fineract.module.stellar.federation.StellarAccountId;
 import org.fineract.module.stellar.horizonadapter.HorizonServerUtilities;
 import org.fineract.module.stellar.horizonadapter.StellarOfferAdjustmentFailedException;
@@ -26,6 +26,7 @@ import org.fineract.module.stellar.persistencedomain.StellarAdjustOfferEventPers
 import org.fineract.module.stellar.repository.AccountBridgeRepository;
 import org.fineract.module.stellar.repository.StellarAdjustOfferEventRepository;
 import org.fineract.module.stellar.horizonadapter.InvalidConfigurationException;
+import org.fineract.module.stellar.persistencedomain.FineractPaymentEventPersistency;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -39,7 +40,7 @@ public class StellarAdjustOfferEventListener implements
   private final AccountBridgeRepository accountBridgeRepository;
   private final StellarAdjustOfferEventRepository stellarAdjustOfferEventRepository;
   private final HorizonServerUtilities horizonServerUtilities;
-  private final ValueSynchronizer<Pair<String, String>> retrySynchronizer;
+  private final ValueSynchronizer<AbstractMap.SimpleEntry<String, String>> retrySynchronizer;
   private final Logger logger;
 
   @Autowired
@@ -61,41 +62,46 @@ public class StellarAdjustOfferEventListener implements
         accountBridgeRepository.findByMifosTenantId(event.getMifosAccountId());
 
 
-    retrySynchronizer.sync(new Pair<>(event.getMifosAccountId(), event.getAssetCode()), () -> {
-      final StellarAdjustOfferEventPersistency eventSource = this.stellarAdjustOfferEventRepository.findOne(event.getEventId());
+    retrySynchronizer.sync(new AbstractMap.SimpleEntry<>(event.getMifosAccountId(), event.getAssetCode()), () -> {
+        final Optional<StellarAdjustOfferEventPersistency> existingEvent = this.stellarAdjustOfferEventRepository.findById(event.getEventId());
 
-      if (accountBridge == null)
-      {
-        eventSource.setOutstandingRetries(0);
-        this.stellarAdjustOfferEventRepository.save(eventSource);
-        return;
-      }
+        final StellarAdjustOfferEventPersistency eventSource;
+        if (existingEvent.isPresent()){
+          
+            eventSource = existingEvent.get();
+            if (accountBridge == null)
+            {
+              eventSource.setOutstandingRetries(0);
+              this.stellarAdjustOfferEventRepository.save(eventSource);
+              return;
+            }
 
-      final Integer outstandingRetries = eventSource.getOutstandingRetries();
-      final Boolean processed = eventSource.getProcessed();
-      if (processed || (outstandingRetries <= 0))
-        return;
+            final Integer outstandingRetries = eventSource.getOutstandingRetries();
+            final Boolean processed = eventSource.getProcessed();
+            if (processed || (outstandingRetries <= 0))
+              return;
 
-      eventSource.setOutstandingRetries(outstandingRetries - 1);
-      this.stellarAdjustOfferEventRepository.save(eventSource);
+            eventSource.setOutstandingRetries(outstandingRetries - 1);
+            this.stellarAdjustOfferEventRepository.save(eventSource);
 
-      try {
-        horizonServerUtilities.adjustOffer(accountBridge.getStellarAccountPrivateKey(),
-            StellarAccountId.mainAccount(accountBridge.getStellarVaultAccountId()), event.getAssetCode());
+            try {
+              horizonServerUtilities.adjustOffer(accountBridge.getStellarAccountPrivateKey(),
+                  StellarAccountId.mainAccount(accountBridge.getStellarVaultAccountId()), event.getAssetCode());
 
-        eventSource.setProcessed(Boolean.TRUE);
-        eventSource.setErrorMessage("");
-        eventSource.setOutstandingRetries(0);
-      } catch (final InvalidConfigurationException |
-          StellarOfferAdjustmentFailedException ex) {
-        eventSource.setProcessed(Boolean.FALSE);
-        eventSource.setErrorMessage(ex.getMessage());
-        if (outstandingRetries == 1) {
-          logger.error("Last offer adjustment attempt failed because: {}", ex.getMessage());
+              eventSource.setProcessed(Boolean.TRUE);
+              eventSource.setErrorMessage("");
+              eventSource.setOutstandingRetries(0);
+            } catch (final InvalidConfigurationException |
+                StellarOfferAdjustmentFailedException ex) {
+              eventSource.setProcessed(Boolean.FALSE);
+              eventSource.setErrorMessage(ex.getMessage());
+              if (outstandingRetries == 1) {
+                logger.error("Last offer adjustment attempt failed because: {}", ex.getMessage());
+              }
+            } finally {
+              this.stellarAdjustOfferEventRepository.save(eventSource);
+            }
         }
-      } finally {
-        this.stellarAdjustOfferEventRepository.save(eventSource);
-      }
     });
   }
 }

@@ -68,18 +68,18 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
     this.stellarPaymentEventRepository = stellarPaymentEventRepository;
     this.logger = logger;
   }
+  
+  @Override 
+  public void onFailure(shadow.com.google.common.base.Optional<Throwable> optnl, shadow.com.google.common.base.Optional<Integer> optnl1){
+    logger.error("ON_FAILURE");
+  }
 
   @Override
   public void setApplicationEventPublisher(final ApplicationEventPublisher eventPublisher) {
     this.eventPublisher = eventPublisher;
   }
-  
-  @Override 
-  public void onFailure(shadow.com.google.common.base.Optional<Throwable> optnl, shadow.com.google.common.base.Optional<Integer> optnl1){
-  }
 
-  @Override 
-  public void onEvent(final EffectResponse operation) {
+  @Override public void onEvent(final EffectResponse operation) {
     final String pagingToken = operation.getPagingToken();
 
     //This is important, because an event can be sent twice if we are managing both the sending and

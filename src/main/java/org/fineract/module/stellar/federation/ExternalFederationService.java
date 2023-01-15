@@ -15,11 +15,11 @@
  */
 package org.fineract.module.stellar.federation;
 
-import org.springframework.stereotype.Service;
-import org.stellar.sdk.federation.*;
-import org.stellar.sdk.federation.FederationResponse;
-
 import java.io.IOException;
+import org.springframework.stereotype.Service;
+import org.stellar.sdk.federation.Federation;
+import org.stellar.sdk.federation.FederationResponse;
+import org.stellar.sdk.federation.MalformedAddressException;
 
 @Service
 public class ExternalFederationService {

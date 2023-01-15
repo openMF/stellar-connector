@@ -22,9 +22,6 @@ import retrofit2.http.POST;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
-
-//import retrofit.http.*;
-
 public interface FineractClientService {
   @GET("/clients/{id}")
   Client findClient(@Header("Authorization") String authorization,

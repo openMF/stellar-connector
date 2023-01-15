@@ -1,0 +1,21 @@
+version: "2.2"
+
+networks:
+  fincore:
+    driver: bridge
+services:
+  mifos-ms-middleware-originacion-credito:
+    image: harbor.infotec.mx/mifosio/com.mx.infotec.fineract.originacion.credito.front.develop
+    restart: always
+    extra_hosts:
+      - "activemq:172.22.216.196"
+    ports:      
+      - 10102:10102
+    networks:
+      - fincore
+    healthcheck:
+      test: curl -kfsS https://127.0.0.1:10102/#/ | grep 'RELEASE' | wc -l
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  

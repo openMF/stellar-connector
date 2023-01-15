@@ -16,7 +16,6 @@
 package org.fineract.module.stellar.horizonadapter;
 
 import org.fineract.module.stellar.federation.StellarAccountId;
-//import org.stellar.sdk.*;
 import org.stellar.sdk.responses.AccountResponse;
 
 import java.math.BigDecimal;
@@ -46,7 +45,7 @@ class StellarAccountHelpers {
   static String getIssuer(final Asset asset) {
     if (asset instanceof AssetTypeCreditAlphaNum)
     {
-      return ((AssetTypeCreditAlphaNum)asset).getIssuer().getAccountId();
+      return ((AssetTypeCreditAlphaNum)asset).getIssuer();
     }
     else
     {
@@ -71,8 +70,7 @@ class StellarAccountHelpers {
     if (balance.getAssetCode() == null)
       return new AssetTypeNative();
     else
-      return Asset.createNonNativeAsset(balance.getAssetCode(),
-          KeyPair.fromAccountId(balance.getAssetIssuer()));
+      return Asset.create(null, balance.getAssetCode().orNull(), balance.getAssetIssuer().orNull());      
   }
 
   static BigDecimal stellarBalanceToBigDecimal(final String balance)
@@ -87,7 +85,7 @@ class StellarAccountHelpers {
 
 
   static Asset getAsset(final String assetCode, final StellarAccountId targetIssuer) {
-    return Asset.createNonNativeAsset(assetCode, KeyPair.fromAccountId(targetIssuer.getPublicKey()));
+    return Asset.create(null, assetCode, targetIssuer.toString());      
   }
 
   static BigDecimal remainingTrustInBalance(final AccountResponse.Balance balance)

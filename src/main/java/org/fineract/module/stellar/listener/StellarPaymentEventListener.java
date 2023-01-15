@@ -15,9 +15,11 @@
  */
 package org.fineract.module.stellar.listener;
 
+import java.util.Optional;
 import org.fineract.module.stellar.fineractadapter.FineractBridgeAccountAdjustmentFailedException;
 import org.fineract.module.stellar.persistencedomain.AccountBridgePersistency;
 import org.fineract.module.stellar.fineractadapter.Adapter;
+import org.fineract.module.stellar.persistencedomain.FineractPaymentEventPersistency;
 import org.fineract.module.stellar.persistencedomain.StellarPaymentEventPersistency;
 import org.fineract.module.stellar.repository.AccountBridgeRepositoryDecorator;
 import org.fineract.module.stellar.repository.StellarPaymentEventRepository;
@@ -29,61 +31,66 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class StellarPaymentEventListener implements ApplicationListener<StellarPaymentEvent> {
-  private final StellarPaymentEventRepository stellarPaymentEventRepository;
-  private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
-  private final Adapter adapter;
-  private final Logger logger;
+    
+    private final StellarPaymentEventRepository stellarPaymentEventRepository;
+    private final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator;
+    private final Adapter adapter;
+    private final Logger logger;
 
-  @Autowired
-  public StellarPaymentEventListener(
-      final StellarPaymentEventRepository stellarPaymentEventRepository,
-      final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
-      final Adapter adapter,
-      @Qualifier("stellarBridgeLogger") final Logger logger) {
-    this.stellarPaymentEventRepository = stellarPaymentEventRepository;
-    this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
-    this.adapter = adapter;
-    this.logger = logger;
-  }
-
-
-  @Override public void onApplicationEvent(final StellarPaymentEvent event) {
-
-    final StellarPaymentEventPersistency eventSource = this.stellarPaymentEventRepository.findOne(event.getEventId());
-
-    final Boolean processed = eventSource.getProcessed();
-    if (processed)
-      return;
-
-    final AccountBridgePersistency accountBridge =
-        accountBridgeRepositoryDecorator.getBridge(event.getMifosTenantId());
-
-    try
-    {
-      if (accountBridge == null)
-      {
-        eventSource.setProcessed(Boolean.FALSE);
-        return;
-      }
-
-      adapter.informMifosOfIncomingStellarPayment(
-          accountBridge.getEndpoint(),
-          accountBridge.getMifosStagingAccount(),
-          accountBridge.getMifosToken(),
-          event.getAmount(), event.getAssetCode(), event.getEventId());
-
-      eventSource.setProcessed(Boolean.TRUE);
-      eventSource.setErrorMessage("");
-      logger.info("Fineract payment processed.");
+    @Autowired
+    public StellarPaymentEventListener(
+        final StellarPaymentEventRepository stellarPaymentEventRepository,
+        final AccountBridgeRepositoryDecorator accountBridgeRepositoryDecorator,
+        final Adapter adapter,
+        @Qualifier("stellarBridgeLogger") final Logger logger) {
+      this.stellarPaymentEventRepository = stellarPaymentEventRepository;
+      this.accountBridgeRepositoryDecorator = accountBridgeRepositoryDecorator;
+      this.adapter = adapter;
+      this.logger = logger;
     }
-    catch (FineractBridgeAccountAdjustmentFailedException ex)
-    {
-      eventSource.setProcessed(Boolean.FALSE);
-      eventSource.setErrorMessage(ex.getMessage());
-      logger.error("Payment attempt failed because \"{}\"", ex.getMessage());
+
+
+    @Override public void onApplicationEvent(final StellarPaymentEvent event) {
+
+        final Optional <StellarPaymentEventPersistency> existingEvent = this.stellarPaymentEventRepository.findById(event.getEventId());
+
+        final StellarPaymentEventPersistency eventSource;
+      
+        if(existingEvent.isPresent()){
+            eventSource = existingEvent.get();
+            final Boolean processed = eventSource.getProcessed();
+            if (processed)
+              return;
+
+            final AccountBridgePersistency accountBridge =
+                accountBridgeRepositoryDecorator.getBridge(event.getMifosTenantId());
+            try
+            {
+              if (accountBridge == null)
+              {
+                eventSource.setProcessed(Boolean.FALSE);
+                return;
+              }
+
+              adapter.informMifosOfIncomingStellarPayment(
+                  accountBridge.getEndpoint(),
+                  accountBridge.getMifosStagingAccount(),
+                  accountBridge.getMifosToken(),
+                  event.getAmount(), event.getAssetCode(), event.getEventId());
+
+              eventSource.setProcessed(Boolean.TRUE);
+              eventSource.setErrorMessage("");
+              logger.info("Fineract payment processed.");
+            }
+            catch (FineractBridgeAccountAdjustmentFailedException ex)
+            {
+              eventSource.setProcessed(Boolean.FALSE);
+              eventSource.setErrorMessage(ex.getMessage());
+              logger.error("Payment attempt failed because \"{}\"", ex.getMessage());
+            }
+            finally {
+              this.stellarPaymentEventRepository.save(eventSource);
+            }
+        }
     }
-    finally {
-      this.stellarPaymentEventRepository.save(eventSource);
-    }
-  }
 }

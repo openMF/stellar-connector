@@ -17,12 +17,9 @@ package org.fineract.module.stellar.fineractadapter;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-//import retrofit.RestAdapter;
-//import retrofit.RetrofitError;
-
-import java.math.BigDecimal;
-import org.fineract.module.stellar.error.RetrofitException;
 import retrofit2.Retrofit;
+import java.math.BigDecimal;
+import org.fineract.module.stellar.util.RetrofitException;
 
 @Component
 public class Adapter {
@@ -43,11 +40,6 @@ public class Adapter {
   {
     try {
       final Retrofit restAdapter = this.restAdapterProvider.get(endpoint);
-      /*final Retrofit restAdapter = new Retrofit.Builder()
-                            .baseUrl(endpoint)
-                            .addConverterFactory(GsonConverterFactory.create())
-                            .build();*/
-      
       final FineractClientService clientService = restAdapter.create(FineractClientService.class);
 
       final JournalEntryCommand command = new JournalEntryCommand();

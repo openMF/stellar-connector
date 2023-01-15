@@ -22,9 +22,9 @@ import org.stellar.sdk.Server;
 import org.stellar.sdk.responses.OfferResponse;
 import org.stellar.sdk.responses.Page;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 import static org.fineract.module.stellar.horizonadapter.StellarAccountHelpers.getAssetCode;
 import static org.fineract.module.stellar.horizonadapter.StellarAccountHelpers.getIssuer;
@@ -87,11 +87,8 @@ class VaultOffer {
       try {
         offers = ((offers.getLinks() == null) || (offers.getLinks().getNext() == null)) ?
             null : offers.getNextPage();
-      } catch (final URISyntaxException e) {
+      } catch (final Exception e) {
         throw new UnexpectedException();
-      }
-      catch (final IOException e) {
-        throw InvalidConfigurationException.unreachableStellarServerAddress("");
       }
     }
 

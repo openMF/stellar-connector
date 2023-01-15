@@ -15,70 +15,82 @@
  */
 package org.fineract.module.stellar.fineractadapter;
 
-//import com.squareup.okhttp.OkHttpClient;
-import org.springframework.stereotype.Component;
-//import retrofit.RestAdapter;
-//import retrofit.client.OkClient;
-
-import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import okhttp3.OkHttpClient;
+import org.springframework.stereotype.Component;
 import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
 
 @Component
 public class RestAdapterProvider {
 
-  public Retrofit get(final String endpoint) {
+    
+    
+    private OkHttpClient clientOkHttp;
 
-    final OkHttpClient okHttpClient = this.createClient();
-
-    /*return new RestAdapter.Builder()
-        .setEndpoint(endpoint)
-        .setClient(new OkClient(okHttpClient))
-        .build();*/
-    return new Retrofit.Builder().baseUrl(endpoint).client(okHttpClient).addConverterFactory(GsonConverterFactory.create()).build();
-  }
-
-  OkHttpClient createClient() {
-
-    final OkHttpClient client = new OkHttpClient();
-
-    final TrustManager[] certs = new TrustManager[]{new X509TrustManager() {
-
-      @Override
-      public X509Certificate[] getAcceptedIssuers() {
-        return null;
-      }
-
-      @Override
-      public void checkServerTrusted(final X509Certificate[] chain,
-          final String authType) throws CertificateException {
-      }
-
-      @Override
-      public void checkClientTrusted(final X509Certificate[] chain,
-          final String authType) throws CertificateException {
-      }
-    }};
-
-    SSLContext ctx = null;
-    try {
-      ctx = SSLContext.getInstance("TLS");
-      ctx.init(null, certs, new SecureRandom());
-    } catch (final java.security.GeneralSecurityException ignored) {
+    public Retrofit get(final String endpoint) {
+        final OkHttpClient okHttpClient = this.createClient();
+        this.setClientOkHttp(okHttpClient);
+        return new Retrofit.Builder().baseUrl(endpoint).client(okHttpClient).build();    
     }
 
-    try {      
-      //client.setHostnameVerifier((hostname, session) -> true);
-      if (ctx != null) {
-        client.sslSocketFactory();
+    private OkHttpClient createClient() {
+
+        final OkHttpClient client = new OkHttpClient();
+
+        final TrustManager[] certs = new TrustManager[]{new X509TrustManager() {
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+          return null;
+        }
+
+        @Override
+        public void checkServerTrusted(final X509Certificate[] chain,
+            final String authType) throws CertificateException {
+        }
+
+        @Override
+        public void checkClientTrusted(final X509Certificate[] chain,
+            final String authType) throws CertificateException {
+        }
+      }};
+
+      SSLContext ctx = null;
+      try {
+        ctx = SSLContext.getInstance("TLS");
+
+        ctx.init(null, certs, new SecureRandom());
+      } catch (final java.security.GeneralSecurityException ignored) {
       }
-    } catch (final Exception ignored) {
+
+      try {                
+        if (ctx != null) {
+          client.sslSocketFactory().createSocket();
+        }
+      } 
+      catch (final Exception ignored) {
+          ignored.printStackTrace();
+      }
+
+      return client;
+    }
+    
+    /**
+     * @return the clientOkHttp
+     */
+    public OkHttpClient getClientOkHttp() {
+        return clientOkHttp;
     }
 
-    return client;
-  }
+    /**
+     * @param clientOkHttp the clientOkHttp to set
+     */
+    public void setClientOkHttp(OkHttpClient clientOkHttp) {
+        this.clientOkHttp = clientOkHttp;
+    }
 }

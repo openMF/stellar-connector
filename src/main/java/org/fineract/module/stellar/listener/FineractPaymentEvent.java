@@ -21,9 +21,6 @@ import org.springframework.context.ApplicationEvent;
 public class FineractPaymentEvent extends ApplicationEvent{
 
   private final Long eventId;
-  
-  
-  public PaymentPersistency findOne(Long eventId);
 
   private final PaymentPersistency payment;
 
