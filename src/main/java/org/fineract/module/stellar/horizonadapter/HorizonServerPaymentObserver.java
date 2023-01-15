@@ -34,59 +34,59 @@ import java.util.Optional;
 @Component
 public class HorizonServerPaymentObserver {
 
-  @Value("${stellar.horizon-address}")
-  private String serverAddress;
+    @Value("${stellar.horizon-address}")
+    private String serverAddress;
 
-  private final AccountBridgeRepository accountBridgeRepository;
-  private final StellarCursorRepository stellarCursorRepository;
-  private final HorizonServerEffectsListener listener;
-  private final Logger logger;
+    private final AccountBridgeRepository accountBridgeRepository;
+    private final StellarCursorRepository stellarCursorRepository;
+    private final HorizonServerEffectsListener listener;
+    private final Logger logger;
 
-  @PostConstruct
-  void init() {
-      
-    final Optional<String> cursor = getCurrentCursor();
-    accountBridgeRepository.findAll()
-        .forEach(bridge -> setupListeningForAccount(
-                    StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
-  }
+    @PostConstruct
+    void init() {
 
-  @Autowired
-  HorizonServerPaymentObserver(
-      final AccountBridgeRepository accountBridgeRepository,
-      final StellarCursorRepository stellarCursorRepository,
-      final HorizonServerEffectsListener listener,
-      final @Qualifier("stellarBridgeLogger") Logger logger) {
-      
-    this.accountBridgeRepository = accountBridgeRepository;
-    this.stellarCursorRepository = stellarCursorRepository;
+      final Optional<String> cursor = getCurrentCursor();
+      accountBridgeRepository.findAll()
+          .forEach(bridge -> setupListeningForAccount(
+                      StellarAccountId.mainAccount(bridge.getStellarAccountId()), cursor));
+    }
 
-    this.listener = listener;
-    this.logger = logger;
-  }
+    @Autowired
+    HorizonServerPaymentObserver(
+        final AccountBridgeRepository accountBridgeRepository,
+        final StellarCursorRepository stellarCursorRepository,
+        final HorizonServerEffectsListener listener,
+        final @Qualifier("stellarBridgeLogger") Logger logger) {
 
-  public void setupListeningForAccount(final StellarAccountId stellarAccountId) {
-    setupListeningForAccount(stellarAccountId, Optional.empty());
-  }
+      this.accountBridgeRepository = accountBridgeRepository;
+      this.stellarCursorRepository = stellarCursorRepository;
 
-  private Optional<String> getCurrentCursor() {
-      
-    final Optional<StellarCursorPersistency> cursorPersistency = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
-    return cursorPersistency.map(StellarCursorPersistency::getCursor);
-    
-  }
+      this.listener = listener;
+      this.logger = logger;
+    }
 
-  private void setupListeningForAccount(
-      @org.jetbrains.annotations.NotNull final StellarAccountId stellarAccountId, @org.jetbrains.annotations.NotNull final Optional<String> cursor)
-  {
-    logger.info("HorizonServerPaymentObserver.setupListeningForAccount {}, cursor {}",
-        stellarAccountId.getPublicKey(), cursor);
+    public void setupListeningForAccount(final StellarAccountId stellarAccountId) {
+      setupListeningForAccount(stellarAccountId, Optional.empty());
+    }
 
-    final EffectsRequestBuilder effectsRequestBuilder
-        = new EffectsRequestBuilder(URI.create(serverAddress));
-    effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
-    cursor.ifPresent(effectsRequestBuilder::cursor);
+    private Optional<String> getCurrentCursor() {
 
-    effectsRequestBuilder.stream(listener);
-  }
+      final Optional<StellarCursorPersistency> cursorPersistency = stellarCursorRepository.findTopByProcessedTrueOrderByCreatedOnDesc();
+      return cursorPersistency.map(StellarCursorPersistency::getCursor);
+
+    }
+
+    private void setupListeningForAccount(
+        @org.jetbrains.annotations.NotNull final StellarAccountId stellarAccountId, @org.jetbrains.annotations.NotNull final Optional<String> cursor)
+    {
+      logger.info("HorizonServerPaymentObserver.setupListeningForAccount {}, cursor {}",
+          stellarAccountId.getPublicKey(), cursor);
+
+      final EffectsRequestBuilder effectsRequestBuilder
+          = new EffectsRequestBuilder(URI.create(serverAddress));
+      effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
+      cursor.ifPresent(effectsRequestBuilder::cursor);
+
+      effectsRequestBuilder.stream(listener);
+    }
 }
