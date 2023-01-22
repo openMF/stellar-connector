@@ -30,6 +30,9 @@ import org.stellar.sdk.requests.EffectsRequestBuilder;
 
 import javax.annotation.PostConstruct;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import shadow.okhttp3.OkHttpClient;
+import shadow.okhttp3.HttpUrl;
 
 @Component
 public class HorizonServerPaymentObserver {
@@ -81,10 +84,20 @@ public class HorizonServerPaymentObserver {
     {
       logger.info("HorizonServerPaymentObserver.setupListeningForAccount {}, cursor {}",
           stellarAccountId.getPublicKey(), cursor);
+      
+      OkHttpClient client = new OkHttpClient.Builder()
+      .readTimeout(1, TimeUnit.SECONDS)
+      .build();
+      
+      HttpUrl httpUrl = new HttpUrl.Builder()
+                        .scheme("https")
+                        .host(serverAddress)
+                        .build();
 
       final EffectsRequestBuilder effectsRequestBuilder
-          = new EffectsRequestBuilder(URI.create(serverAddress));
-      effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()));
+          = new EffectsRequestBuilder(client, httpUrl);
+      
+      effectsRequestBuilder.forAccount(KeyPair.fromAccountId(stellarAccountId.getPublicKey()).getAccountId());
       cursor.ifPresent(effectsRequestBuilder::cursor);
 
       effectsRequestBuilder.stream(listener);

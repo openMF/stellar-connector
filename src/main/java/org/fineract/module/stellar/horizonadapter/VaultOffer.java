@@ -25,9 +25,11 @@ import org.stellar.sdk.responses.Page;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static org.fineract.module.stellar.horizonadapter.StellarAccountHelpers.getAssetCode;
 import static org.fineract.module.stellar.horizonadapter.StellarAccountHelpers.getIssuer;
+import shadow.okhttp3.OkHttpClient;
 
 class VaultOffer {
   final String assetCode;
@@ -85,8 +87,12 @@ class VaultOffer {
       }
 
       try {
-        offers = ((offers.getLinks() == null) || (offers.getLinks().getNext() == null)) ?
-            null : offers.getNextPage();
+          OkHttpClient client = new OkHttpClient.Builder()
+            .readTimeout(1, TimeUnit.SECONDS)
+            .build();
+          
+            offers = ((offers.getLinks() == null) || (offers.getLinks().getNext() == null)) ?
+                null : offers.getNextPage(client);
       } catch (final Exception e) {
         throw new UnexpectedException();
       }
