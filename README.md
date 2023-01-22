@@ -1,3 +1,5 @@
-# fineract-cn-middleware-brms
+# Stellar Network Connector
 
-mvn spring-boot:run
+Use with Apache Fineract webhooks
+
+Video as reference: https://youtu.be/QCjbcoCZyQM
