@@ -28,28 +28,33 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.stellar.sdk.Account;
 import org.stellar.sdk.AccountMergeOperation;
 import org.stellar.sdk.Asset;
+import org.stellar.sdk.ChangeTrustAsset;
 import org.stellar.sdk.ChangeTrustOperation;
 import org.stellar.sdk.CreateAccountOperation;
 import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.ManageBuyOfferOperation;
 import org.stellar.sdk.Memo;
+import org.stellar.sdk.Network;
+import org.stellar.sdk.PathPaymentStrictSendOperation;
 import org.stellar.sdk.Server;
 import org.stellar.sdk.SetOptionsOperation;
 import org.stellar.sdk.Transaction;
+import org.stellar.sdk.PaymentOperation;
 import org.stellar.sdk.responses.AccountResponse;
 import org.stellar.sdk.responses.Page;
 import org.stellar.sdk.responses.PathResponse;
 import org.stellar.sdk.responses.SubmitTransactionResponse;
+import shadow.okhttp3.OkHttpClient;
 
 @Component
 public class HorizonServerUtilities {
@@ -218,10 +223,10 @@ public class HorizonServerUtilities {
 
     final Account accountSequencer = accounts.getUnchecked(dyingBreed.getAccountId());
     final AccountMergeOperation.Builder mergeOperation =
-        new AccountMergeOperation.Builder(lastManStanding)
-            .setSourceAccount(dyingBreed);
-
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(accountSequencer);
+        new AccountMergeOperation.Builder(lastManStanding.getAccountId())
+            .setSourceAccount(dyingBreed.getAccountId());
+    
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(accountSequencer,Network.TESTNET);
     transactionBuilder.addOperation(mergeOperation.build());
 
     submitTransaction(accountSequencer, transactionBuilder, dyingBreed, AccountMergerFailedException::stellarRefused);
@@ -322,10 +327,10 @@ public class HorizonServerUtilities {
     final BigDecimal trustSize = balance.max(maximumAmount);
 
     final Transaction.Builder trustTransactionBuilder =
-        new Transaction.Builder(trustingAccount);
+        new Transaction.Builder(trustingAccount, Network.TESTNET);
 
     final ChangeTrustOperation trustOperation =
-        new ChangeTrustOperation.Builder(asset, StellarAccountHelpers.bigDecimalToStellarBalance(trustSize)).build();
+        new ChangeTrustOperation.Builder(ChangeTrustAsset.create(asset), StellarAccountHelpers.bigDecimalToStellarBalance(trustSize)).build();
 
     trustTransactionBuilder.addOperation(trustOperation);
 
@@ -363,15 +368,15 @@ public class HorizonServerUtilities {
     final Account sourceAccount = accounts.getUnchecked(sourceAccountKeyPair.getAccountId());
 
     final Transaction.Builder transferTransactionBuilder
-        = new Transaction.Builder(sourceAccount);
-    final PathPaymentOperation paymentOperation =
-        new PathPaymentOperation.Builder(
+        = new Transaction.Builder(sourceAccount, Network.TESTNET);
+    final PathPaymentStrictSendOperation paymentOperation =
+        new PathPaymentStrictSendOperation.Builder(
             sendAsset,
             StellarAccountHelpers.bigDecimalToStellarBalance(amount),
-            targetAccountKeyPair,
+            targetAccountKeyPair.getAccountId(),
             receiveAsset,
             StellarAccountHelpers.bigDecimalToStellarBalance(amount))
-            .setSourceAccount(sourceAccountKeyPair).build();
+            .setSourceAccount(sourceAccountKeyPair.getAccountId()).build();
 
     transferTransactionBuilder.addOperation(paymentOperation);
 
@@ -453,7 +458,7 @@ public class HorizonServerUtilities {
     offers.refresh(offerKey);
     final Map<VaultOffer, Long> vaultOffers = offers.getUnchecked(offerKey);
 
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(account);
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(account, Network.TESTNET);
     accountHelper.getAllNonnativeBalancesStream(assetCode, vaultAsset)
         .filter(balance -> !balance.getAssetIssuer().equals(vaultAccountId.getPublicKey()))
         .map(balance -> offerOperation(
@@ -510,12 +515,12 @@ public class HorizonServerUtilities {
       throws InvalidConfigurationException, StellarAccountCreationFailedException
   {
     final Transaction.Builder transactionBuilder
-        = new Transaction.Builder(installationAccount);
+        = new Transaction.Builder(installationAccount, Network.TESTNET);
 
     final CreateAccountOperation createAccountOperation =
-        new CreateAccountOperation.Builder(newAccountKeyPair,
+        new CreateAccountOperation.Builder(newAccountKeyPair.getAccountId(),
             Integer.toString(initialBalance)).
-            setSourceAccount(installationAccountKeyPair)
+            setSourceAccount(installationAccountKeyPair.getAccountId())
             .build();
 
     transactionBuilder.addOperation(createAccountOperation);
@@ -530,17 +535,17 @@ public class HorizonServerUtilities {
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
     final Account newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount, Network.TESTNET);
 
     final SetOptionsOperation.Builder setOptionsOperationBuilder =
-        new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair);
+        new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair.getAccountId());
 
     if (localFederationDomain != null)
     {
       setOptionsOperationBuilder.setHomeDomain(localFederationDomain);
     }
 
-    setOptionsOperationBuilder.setInflationDestination(installationAccountKeyPair);
+    setOptionsOperationBuilder.setInflationDestination(installationAccountKeyPair.getAccountId());
 
     transactionBuilder.addOperation(setOptionsOperationBuilder.build());
 
@@ -553,10 +558,10 @@ public class HorizonServerUtilities {
       throws StellarAccountCreationFailedException, InvalidConfigurationException
   {
     final Account newAccount = accounts.getUnchecked(newAccountKeyPair.getAccountId());
-    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount);
+    final Transaction.Builder transactionBuilder = new Transaction.Builder(newAccount, Network.TESTNET);
 
     final SetOptionsOperation.Builder setOptionsOperationBuilder =
-        new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair);
+        new SetOptionsOperation.Builder().setSourceAccount(newAccountKeyPair.getAccountId());
 
     setOptionsOperationBuilder.setSetFlags(0x2);
 
@@ -571,7 +576,7 @@ public class HorizonServerUtilities {
   {
     final AccountResponse installationAccount;
     try {
-      installationAccount = server.accounts().account(installationAccountKeyPair);
+      installationAccount = server.accounts().account(installationAccountKeyPair.getAccountId());
     }
     catch (final Exception e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
@@ -625,9 +630,9 @@ public class HorizonServerUtilities {
     for (final Asset targetAsset : targetAssets) {
       Page<PathResponse> paths;
       try {
-        paths = server.paths()
-            .sourceAccount(sourceAccountKeyPair)
-            .destinationAccount(targetAccountKeyPair)
+        paths = server.strictReceivePaths()
+            .sourceAccount(sourceAccountKeyPair.getAccountId())
+            .destinationAccount(targetAccountKeyPair.getAccountId())
             .destinationAsset(targetAsset)
             .destinationAmount(StellarAccountHelpers.bigDecimalToStellarBalance(amount))
             .execute();
@@ -648,8 +653,12 @@ public class HorizonServerUtilities {
         }
 
         try {
-          paths = ((paths.getLinks() == null) || (paths.getLinks().getNext() == null)) ?
-              null : paths.getNextPage();
+            OkHttpClient client = new OkHttpClient.Builder()
+                .readTimeout(1, TimeUnit.SECONDS)
+                .build();
+            
+            paths = ((paths.getLinks() == null) || (paths.getLinks().getNext() == null)) ?
+                null : paths.getNextPage(client);
         } catch (final Exception e) {
           throw new UnexpectedException();
         }
@@ -694,7 +703,7 @@ public class HorizonServerUtilities {
           throw failureHandler.get();
         }
       }
-    } catch (final IOException e) {
+    } catch (final Exception e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress(serverAddress);
     }
   }
