@@ -59,12 +59,6 @@ public class BridgeConfiguration {
   }
 
   @Bean
-  public Gson gson()
-  {
-    return new Gson();
-  }
-
-  @Bean
   public Logger stellarBridgeLogger() {
     return LoggerFactory.getLogger("StellarBridge");
   }
