@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM azul/zulu-openjdk:11-jre-headless as runner
+FROM azul/zulu-openjdk:17-latest as runner
 
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get update \
 	&& apt-get install -y --no-install-recommends locales netcat wget unzip tzdata telnet vim dos2unix curl software-properties-common gnupg apt-transport-https software-properties-common \
