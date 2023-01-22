@@ -56,7 +56,7 @@ public class UnprocessedEventObserver implements ApplicationEventPublisherAware 
   }
 
   @Scheduled(fixedRate=300000) //Once every five minutes.
-  @Transactional
+  @Transactional(readOnly = true)
   void resendUnprocessedMifosPayments() {
     logger.info("Checking for and resending unprocessed payment events.");
     final Stream<FineractPaymentEventPersistency> events
