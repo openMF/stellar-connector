@@ -32,6 +32,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.stream.Stream;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class UnprocessedEventObserver implements ApplicationEventPublisherAware {
@@ -55,6 +56,7 @@ public class UnprocessedEventObserver implements ApplicationEventPublisherAware 
   }
 
   @Scheduled(fixedRate=300000) //Once every five minutes.
+  @Transactional
   void resendUnprocessedMifosPayments() {
     logger.info("Checking for and resending unprocessed payment events.");
     final Stream<FineractPaymentEventPersistency> events
