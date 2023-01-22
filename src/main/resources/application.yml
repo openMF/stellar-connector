@@ -16,10 +16,10 @@ spring:
       ddl-auto: none
 
   datasource:
-    url: jdbc:hsqldb:file:stellarmoduledb
-    username: sa
-    password:
-    driver-class-name: org.hsqldb.jdbcDriver
+    url: jdbc:mariadb://database-server:3306/stellar_connector
+    username: root
+    password: skdcnwauicn2ucnaecasdsajdnizucawencascdca
+    driver-class-name: org.mariadb.jdbc.Driver
 
 # stellar horizon server configuration
 stellar:

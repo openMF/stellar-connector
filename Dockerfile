@@ -15,19 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM azul/zulu-openjdk-debian:17.0.2-jre-headless as runner
+FROM azul/zulu-openjdk:11-jre-headless as runner
 
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get update \
 	&& apt-get install -y --no-install-recommends locales netcat wget unzip tzdata telnet vim dos2unix curl software-properties-common gnupg apt-transport-https software-properties-common \
 	&& ln -fs /usr/share/zoneinfo/Asia/Aden /etc/localtime \
 	&& dpkg-reconfigure --frontend noninteractive tzdata dos2unix \
-        && sed -i -e 's/# es_MX.UTF-8 UTF-8/es_MX.UTF-8 UTF-8/' /etc/locale.gen \
-        && locale-gen  \
 	&& apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-ENV LANG es_MX.UTF-8  
-ENV LANGUAGE es_MX:es  
-ENV LC_ALL es_MX.UTF-8   
 
 COPY entrypoint.sh .
 
@@ -35,8 +29,8 @@ RUN chmod +x /entrypoint.sh
 
 WORKDIR /tmp
 
-COPY ./target/phee-service-entrypoint-0.0.1.jar phee-service-entrypoint-0.0.1.jar
+COPY ./target/stellar-connector-0.0.1.jar stellar-connector-0.0.1.jar
 
-EXPOSE 61616
+EXPOSE 9192
 
 ENTRYPOINT /entrypoint.sh
