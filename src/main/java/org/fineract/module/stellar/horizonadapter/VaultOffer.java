@@ -22,12 +22,14 @@ import org.stellar.sdk.Server;
 import org.stellar.sdk.responses.OfferResponse;
 import org.stellar.sdk.responses.Page;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static org.fineract.module.stellar.horizonadapter.StellarAccountHelpers.getAssetCode;
 import static org.fineract.module.stellar.horizonadapter.StellarAccountHelpers.getIssuer;
+import shadow.okhttp3.OkHttpClient;
 
 class VaultOffer {
   final String assetCode;
@@ -63,8 +65,8 @@ class VaultOffer {
 
     Page<OfferResponse> offers;
     try {
-      offers = server.offers().forAccount(accountKeyPair).execute();
-    } catch (final IOException e) {
+      offers = server.offers().forAccount(accountKeyPair.getAccountId()).execute();
+    } catch (final Exception e) {
       throw InvalidConfigurationException.unreachableStellarServerAddress("");
     }
 
@@ -85,13 +87,14 @@ class VaultOffer {
       }
 
       try {
-        offers = ((offers.getLinks() == null) || (offers.getLinks().getNext() == null)) ?
-            null : offers.getNextPage();
-      } catch (final URISyntaxException e) {
+          OkHttpClient client = new OkHttpClient.Builder()
+            .readTimeout(1, TimeUnit.SECONDS)
+            .build();
+          
+            offers = ((offers.getLinks() == null) || (offers.getLinks().getNext() == null)) ?
+                null : offers.getNextPage(client);
+      } catch (final Exception e) {
         throw new UnexpectedException();
-      }
-      catch (final IOException e) {
-        throw InvalidConfigurationException.unreachableStellarServerAddress("");
       }
     }
 

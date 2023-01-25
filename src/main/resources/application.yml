@@ -10,20 +10,20 @@ endpoints:
 # database configuration
 spring:
   jpa:
-    show-sql: false
-    generate-ddl: false
+    show-sql: true
+    generate-ddl: true
     hibernate:
       ddl-auto: none
 
   datasource:
-    url: jdbc:hsqldb:file:stellarmoduledb
-    username: sa
-    password:
-    driver-class-name: org.hsqldb.jdbcDriver
+    url: jdbc:mariadb://database-server:3306/stellar_connector
+    username: root
+    password: skdcnwauicn2ucnaecasdsajdnizucawencascdca
+    driver-class-name: org.mariadb.jdbc.Driver
 
 # stellar horizon server configuration
 stellar:
-  horizon-address: https://horizon-testnet.stellar.org
-  installation-account-private-key: SDHOAMBNLGCE2MV5ZKIVZAQD3VCLGP53P3OBSBI6UN5L5XZI5TKHFQL4
-  local-federation-domain: mifos-installation.org
+  horizon-address: https://horizon.fintechsys.net
+  installation-account-private-key: GC3H6AEDE56Q3TRQG3HXQ4K6PNZD2YWKA63T6X74ZW4V7XTTHKO3TQFJSAWGKNJJ4O5YLITG34JBRLP55VEVQ7QNAPWXS3AFFO7QHLYQG7K5ZYHW
+  local-federation-domain: 
   new-account-initial-balance: 10000

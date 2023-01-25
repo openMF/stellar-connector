@@ -108,7 +108,7 @@ public class AccountBridgeRepositoryDecorator {
       return;
     }
 
-    this.accountBridgeRepository.delete(bridge.getId());
+    this.accountBridgeRepository.delete(bridge);
   }
 
   public AccountBridgePersistency getBridge(final String mifosTenantId)
