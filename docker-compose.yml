@@ -1,0 +1,32 @@
+version: '3.7'
+services:
+  # Backend service
+  database-server:
+    image: mariadb:10.9
+    ports:
+      - 3308:3306
+    volumes:
+      - ./data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: skdcnwauicn2ucnaecasdsajdnizucawencascdca
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "--password=skdcnwauicn2ucnaecasdsajdnizucawencascdca" ]
+      timeout: 10s
+      retries: 10
+  stellar-connector:
+    image: hharbor.flexcore.mx/fintechsys/com.ye.fintechsys.mifos.stellar-connector.update_jdk
+    healthcheck:
+      test: ["CMD", 'sh', '-c', 'echo -e "Checking for the availability of Stellar Connector deployment"; while ! nc -z "stellar-connector" 9192; do sleep 1; printf "-"; done; echo -e " >> Stellar Connector has started";' ]
+      timeout: 10s
+      retries: 10
+    ports:
+      - 9192:9192
+    depends_on:
+      database-server:
+        condition: service_healthy
+    environment:
+      #- stellar.horizon-address=https://horizon.fintechsys.net
+      #- stellar.installation-account-private-key=GC3H6AEDE56Q3TRQG3HXQ4K6PNZD2YWKA63T6X74ZW4V7XTTHKO3TQFJSAWGKNJJ4O5YLITG34JBRLP55VEVQ7QNAPWXS3AFFO7QHLYQG7K5ZYHW
+      #- stellar.local-federation-domain=
+      #- stellar.new-account-initial-balance=10000

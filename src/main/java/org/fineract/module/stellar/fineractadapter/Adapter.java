@@ -17,10 +17,9 @@ package org.fineract.module.stellar.fineractadapter;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import retrofit.RestAdapter;
-import retrofit.RetrofitError;
-
+import retrofit2.Retrofit;
 import java.math.BigDecimal;
+import org.fineract.module.stellar.util.RetrofitException;
 
 @Component
 public class Adapter {
@@ -40,7 +39,7 @@ public class Adapter {
       final BigDecimal amount) throws FineractBridgeAccountAdjustmentFailedException
   {
     try {
-      final RestAdapter restAdapter = this.restAdapterProvider.get(endpoint);
+      final Retrofit restAdapter = this.restAdapterProvider.get(endpoint);
       final FineractClientService clientService = restAdapter.create(FineractClientService.class);
 
       final JournalEntryCommand command = new JournalEntryCommand();
@@ -53,9 +52,9 @@ public class Adapter {
 
       clientService.createSavingsAccountTransaction(STELLAR_TRANSFER_ACCOUNT, "withdrawal", command);
     }
-    catch (final RetrofitError ex)
+    catch (final RetrofitException ex)
     {
-      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().getReason());
+      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().message());
     }
   }
 
@@ -68,7 +67,7 @@ public class Adapter {
       final Long eventId) throws FineractBridgeAccountAdjustmentFailedException
   {
     try {
-      final RestAdapter restAdapter = this.restAdapterProvider.get(endpoint);
+      final Retrofit restAdapter = this.restAdapterProvider.get(endpoint);
       final FineractClientService clientService = restAdapter.create(FineractClientService.class);
 
       final JournalEntryCommand command = new JournalEntryCommand();
@@ -81,9 +80,9 @@ public class Adapter {
 
       clientService.createSavingsAccountTransaction(STELLAR_TRANSFER_ACCOUNT, "deposit", command);
     }
-    catch (final RetrofitError ex)
+    catch (final RetrofitException ex)
     {
-      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().getReason());
+      throw new FineractBridgeAccountAdjustmentFailedException(ex.getResponse().message());
     }
   }
 

@@ -22,7 +22,6 @@ import org.springframework.stereotype.Repository;
 import java.util.stream.Stream;
 
 @Repository
-public interface FineractPaymentEventRepository
-    extends CrudRepository<FineractPaymentEventPersistency, Long> {
+public interface FineractPaymentEventRepository extends CrudRepository<FineractPaymentEventPersistency, Long> {
   Stream<FineractPaymentEventPersistency> findByProcessedFalseAndOutstandingRetriesGreaterThan(int i);
 }

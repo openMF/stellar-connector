@@ -68,6 +68,11 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
     this.stellarPaymentEventRepository = stellarPaymentEventRepository;
     this.logger = logger;
   }
+  
+  @Override 
+  public void onFailure(shadow.com.google.common.base.Optional<Throwable> optnl, shadow.com.google.common.base.Optional<Integer> optnl1){
+    logger.error("ON_FAILURE");
+  }
 
   @Override
   public void setApplicationEventPublisher(final ApplicationEventPublisher eventPublisher) {
@@ -108,7 +113,7 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
     {
       final AccountCreditedEffectResponse accountCreditedEffect = (AccountCreditedEffectResponse) effect;
       final AccountBridgePersistency toAccount
-          = accountBridgeRepository.findByStellarAccountId(effect.getAccount().getAccountId());
+          = accountBridgeRepository.findByStellarAccountId(effect.getAccount());
       if (toAccount == null)
         return; //Nothing to do.  Not one of ours.
 
@@ -147,7 +152,7 @@ public class HorizonServerEffectsListener implements EventListener<EffectRespons
       final AccountDebitedEffectResponse accountDebitedEffect = (AccountDebitedEffectResponse)effect;
 
       final AccountBridgePersistency toAccount = accountBridgeRepository
-          .findByStellarAccountId(accountDebitedEffect.getAccount().getAccountId());
+          .findByStellarAccountId(accountDebitedEffect.getAccount());
       if (toAccount == null)
         return; //Nothing to do.  Not one of ours.
 

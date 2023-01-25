@@ -15,13 +15,17 @@
  */
 package org.fineract.module.stellar.fineractadapter;
 
-
-import retrofit.http.*;
+import retrofit2.http.Body;
+import retrofit2.http.GET;
+import retrofit2.http.Header;
+import retrofit2.http.POST;
+import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 public interface FineractClientService {
   @GET("/clients/{id}")
   Client findClient(@Header("Authorization") String authorization,
-      @Header("X-Mifos-Platform-TenantId") String tenantIdentifier,
+      @Header("Fineract-Platform-TenantId") String tenantIdentifier,
       @Path("id") final long id);
 
   @POST("/savingsaccounts/{accountId}/transactions")
